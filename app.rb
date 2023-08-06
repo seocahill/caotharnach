@@ -5,39 +5,33 @@ require 'net/http'
 require 'uri'
 require 'pry'
 
+OpenAI.configure do |config|
+  config.access_token = ENV['OPENAI_KEY']
+  config.organization_id = ENV['OPENAI_ORG']
+end
+
+$context = [
+  { role: 'system', content: "You are an Irish speaker called 'An Chaothernach'. You are chatting with another Irish speaker about everyday things, e.g. your job, your family, holidays, the news, the weather, etc." }
+]
+
 set :public_folder, File.dirname(__FILE__)
 
 get '/' do
   erb :index
 end
 
-post '/process_audio' do
-  audio_blob = params[:audio][:tempfile].read
-  response = process_audio(audio_blob)
-  content_type :json
-  response.to_json
-end
-
-post '/synthesize_speech' do
-  text = params[:text]
-  audio_content = synthesize_speech(text)
-  content_type :json
-  { audioContent: audio_content }.to_json
-end
-
-post '/chat_with_gpt' do
-  user_input = params[:user_input]
-  gpt_response = chat_with_gpt(user_input)
-  content_type :json
-  { response: gpt_response.choices[0].text.strip }.to_json
-end
-
 post '/forward_audio' do
   request_payload = JSON.parse(request.body.read)
   audio_blob = request_payload['audio_blob']
   response = forward_audio(audio_blob)
+  prompt = JSON.parse(response.to_json).dig("transcriptions", 0, "utterance")
+  $context << { role: "user", content: prompt }
+  puts prompt
+  reply = chat_with_gpt
+  $context << { role: "assistant", content: reply }
+  puts reply
   content_type :json
-  response.to_json
+  synthesize_speech(reply)
 end
 
 def forward_audio(audio_blob)
@@ -59,46 +53,18 @@ def forward_audio(audio_blob)
   JSON.parse(response.body)
 end
 
-
-
-def chat_with_gpt(user_input)
-  # Replace with your actual OpenAI GPT-3 API endpoint and authorization
-  api_key = 'YOUR_OPENAI_API_KEY'
-  gpt_endpoint = 'https://api.openai.com/v1/engines/gpt-3.5-turbo/completions'
-
-  uri = URI.parse(gpt_endpoint)
-  http = Net::HTTP.new(uri.host, uri.port)
-  http.use_ssl = true
-  request = Net::HTTP::Post.new(uri.path)
-  request['Authorization'] = "Bearer #{api_key}"
-  request['Content-Type'] = 'application/json'
-  request.body = {
-    prompt: user_input,
-    max_tokens: 50  # Adjust as needed
-  }.to_json
-
-  response = http.request(request)
-  JSON.parse(response.body)
+def truncated_context
+  $context.last(10).join('\n')
 end
 
-def process_audio(audio_blob)
-  uri = URI.parse('https://phoneticsrv3.lcs.tcd.ie/asr_api/recognise')
-  http = Net::HTTP.new(uri.host, uri.port)
-  http.use_ssl = true
-  request = Net::HTTP::Post.new(uri.path)
-
-  # Construct JSON payload
-  payload = {
-    recogniseBlob: Base64.strict_encode64(audio_blob),  # Encode audio as base64
-    developer: true,
-    method: 'online2bin'
-  }
-
-  request.body = payload.to_json
-  request['Content-Type'] = 'application/json'
-  debugger
-  # response = http.request(request)
-  # JSON.parse(response.body)
+def chat_with_gpt
+  response = OpenAI::Client.new.chat(parameters: {
+    model: 'gpt-3.5-turbo',
+    messages: $context,
+    temperature: 0.5
+  })
+  puts response
+  response.dig('choices', 0, 'message', 'content')
 end
 
 def synthesize_speech(text)
@@ -115,6 +81,5 @@ def synthesize_speech(text)
   }.to_json
   request['Content-Type'] = 'application/json'
   response = http.request(request)
-  data = JSON.parse(response.body)
-  data['audioContent']
+  response.body
 end

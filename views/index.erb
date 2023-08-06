@@ -33,17 +33,17 @@
                           await processAudio(audioBlob);
                       };
 
-                      mediaRecorder.start();
                       startBtn.value = 'Stop Recording';
                       isRecording = true;
+                      mediaRecorder.start();
 
                       setTimeout(() => {
                           mediaRecorder.stop();
-                          startBtn.textContent = 'Start Recording';
+                          startBtn.value = 'Start Recording';
                           isRecording = false;
-                      }, 5000); // Stop recording after 5 seconds
+                      }, 10000); // Stop recording after 10 seconds
                   } catch (error) {
-                      console.error('Error starting recording:', error);
+                      alert('Error recording audio');
                   }
               } else {
                   mediaRecorder.stop();
@@ -64,17 +64,35 @@
                 });
 
                 const data = await response.json();
-                const transcription = data.transcriptions[0].utterance;
-                console.log(transcription)
+                // Assuming gaelicResponse is the object you received with audioContent
+                const audioContent = data.audioContent;
 
-                // const gaelicResponse = await fetchGaelicResponse(transcription);
-                // await playAudio(gaelicResponse.audioContent);
+                // Convert Base64 audio content to Blob
+                const decodedAudioBlob = base64ToBlob(audioContent);
 
-                // const gptResponse = await chatWithGpt(transcription); // Use user input for GPT prompt
-                // displayGptResponse(gptResponse.response);
+                // Create an audio element
+                const audio = new Audio();
+
+                // Create a Blob URL from the audio Blob
+                const blobUrl = URL.createObjectURL(decodedAudioBlob);
+
+                // Set the audio source to the Blob URL
+                audio.src = blobUrl;
+
+                // Play the audio
+                audio.play();
             } catch (error) {
                 console.error('Error processing audio:', error);
             }
+        }
+
+        function base64ToBlob(base64) {
+            const binaryString = atob(base64);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return new Blob([bytes], { type: 'audio/wav' });
         }
 
         async function blobToBase64(blob) {
