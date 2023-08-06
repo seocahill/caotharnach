@@ -3,6 +3,7 @@ require 'sinatra'
 require 'json'
 require 'net/http'
 require 'uri'
+require 'pry'
 
 set :public_folder, File.dirname(__FILE__)
 
@@ -34,6 +35,7 @@ end
 post '/forward_audio' do
   request_payload = JSON.parse(request.body.read)
   audio_blob = request_payload['audio_blob']
+  binding.pry
   puts audio_blob
   # response = forward_audio(audio_blob)
   # content_type :json
