@@ -1,0 +1,98 @@
+<!-- index.erb -->
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Speech Recognition and Text-to-Speech App</title>
+  </head>
+  <body>
+    <input type="button" id="startBtn" value="Start Recording">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+      $(document).ready(function() {
+          const startBtn = document.getElementById('startBtn');
+          let mediaRecorder;
+          let isRecording = false;
+
+          startBtn.addEventListener('click', toggleRecording);
+
+          async function toggleRecording(e) {
+              if (!isRecording) {
+                  try {
+                      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                      mediaRecorder = new MediaRecorder(stream);
+                      let audioChunks = [];
+
+                      mediaRecorder.ondataavailable = event => {
+                          if (event.data.size > 0) {
+                              audioChunks.push(event.data);
+                          }
+                      };
+
+                      mediaRecorder.onstop = async () => {
+                          const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                          await processAudio(audioBlob);
+                      };
+
+                      mediaRecorder.start();
+                      debugger
+                      startBtn.textContent = 'Stop Recording';
+                      isRecording = true;
+
+                      setTimeout(() => {
+                          mediaRecorder.stop();
+                          startBtn.textContent = 'Start Recording';
+                          isRecording = false;
+                      }, 5000); // Stop recording after 5 seconds
+                  } catch (error) {
+                      console.error('Error starting recording:', error);
+                  }
+              } else {
+                  mediaRecorder.stop();
+                  startBtn.textContent = 'Start Recording';
+                  isRecording = false;
+              }
+          }
+
+          async function processAudio(audioBlob) {
+            try {
+                const formData = new FormData();
+                formData.append('audio_blob', audioBlob);
+
+                const response = await fetch('/forward_audio', {
+                  method: 'POST',
+                  body: JSON.stringify({ audio_blob: audioBlob }),
+                  headers: {
+                  'Content-Type': 'application/json'
+                  }
+                });
+
+                const data = await response.json();
+                const transcription = data.transcriptions[0].utterance;
+                console.log(transcription)
+
+                // const gaelicResponse = await fetchGaelicResponse(transcription);
+                // await playAudio(gaelicResponse.audioContent);
+
+                // const gptResponse = await chatWithGpt(transcription); // Use user input for GPT prompt
+                // displayGptResponse(gptResponse.response);
+            } catch (error) {
+                console.error('Error processing audio:', error);
+            }
+        }
+
+
+        async function chatWithGpt(userInput) {
+            const response = await fetch('/chat_with_gpt', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ user_input: userInput })
+            });
+
+            return await response.json();
+        }
+    });
+    </script>
+  </body>
+</html>

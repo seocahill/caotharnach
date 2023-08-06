@@ -24,20 +24,81 @@ post '/synthesize_speech' do
   { audioContent: audio_content }.to_json
 end
 
-def process_audio(audio_blob)
-  # Replace with your actual API endpoint and logic for audio processing
+post '/chat_with_gpt' do
+  user_input = params[:user_input]
+  gpt_response = chat_with_gpt(user_input)
+  content_type :json
+  { response: gpt_response.choices[0].text.strip }.to_json
+end
+
+post '/forward_audio' do
+  request_payload = JSON.parse(request.body.read)
+  audio_blob = request_payload['audio_blob']
+  puts audio_blob
+  # response = forward_audio(audio_blob)
+  # content_type :json
+  # response.to_json
+end
+
+def forward_audio(audio_blob)
   uri = URI.parse('https://phoneticsrv3.lcs.tcd.ie/asr_api/recognise')
   http = Net::HTTP.new(uri.host, uri.port)
   http.use_ssl = true
   request = Net::HTTP::Post.new(uri.path)
-  form_data = {
-    'recogniseBlob' => UploadIO.new(StringIO.new(audio_blob), 'audio/wav', 'audio.wav'),
-    'developer' => 'true',
-    'method' => 'online2bin'
+
+  payload = {
+    recogniseBlob: audio_blob,
+    developer: true,
+    method: 'online2bin'
   }
-  request.set_form(form_data)
+
+  request.body = payload.to_json
+  request['Content-Type'] = 'application/json'
+
   response = http.request(request)
   JSON.parse(response.body)
+end
+
+
+
+def chat_with_gpt(user_input)
+  # Replace with your actual OpenAI GPT-3 API endpoint and authorization
+  api_key = 'YOUR_OPENAI_API_KEY'
+  gpt_endpoint = 'https://api.openai.com/v1/engines/gpt-3.5-turbo/completions'
+
+  uri = URI.parse(gpt_endpoint)
+  http = Net::HTTP.new(uri.host, uri.port)
+  http.use_ssl = true
+  request = Net::HTTP::Post.new(uri.path)
+  request['Authorization'] = "Bearer #{api_key}"
+  request['Content-Type'] = 'application/json'
+  request.body = {
+    prompt: user_input,
+    max_tokens: 50  # Adjust as needed
+  }.to_json
+
+  response = http.request(request)
+  JSON.parse(response.body)
+end
+
+def process_audio(audio_blob)
+  uri = URI.parse('https://phoneticsrv3.lcs.tcd.ie/asr_api/recognise')
+  http = Net::HTTP.new(uri.host, uri.port)
+  http.use_ssl = true
+  request = Net::HTTP::Post.new(uri.path)
+
+  # Construct JSON payload
+  payload = {
+    recogniseBlob: Base64.strict_encode64(audio_blob),  # Encode audio as base64
+    developer: true,
+    method: 'online2bin'
+  }
+
+  request.body = payload.to_json
+  request['Content-Type'] = 'application/json'
+  debugger
+  # response = http.request(request)
+  # JSON.parse(response.body)
 end
 
 def synthesize_speech(text)
