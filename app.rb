@@ -35,11 +35,9 @@ end
 post '/forward_audio' do
   request_payload = JSON.parse(request.body.read)
   audio_blob = request_payload['audio_blob']
-  binding.pry
-  puts audio_blob
-  # response = forward_audio(audio_blob)
-  # content_type :json
-  # response.to_json
+  response = forward_audio(audio_blob)
+  content_type :json
+  response.to_json
 end
 
 def forward_audio(audio_blob)
