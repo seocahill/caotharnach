@@ -33,40 +33,40 @@
           startBtn.addEventListener('click', toggleRecording);
 
           async function toggleRecording(e) {
-              if (!isRecording) {
-                  try {
-                      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                      mediaRecorder = new MediaRecorder(stream);
-                      let audioChunks = [];
+            try {
+                if (!isRecording) {
+                  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                  mediaRecorder = new MediaRecorder(stream);
+                  let audioChunks = [];
 
-                      mediaRecorder.ondataavailable = event => {
-                          if (event.data.size > 0) {
-                              audioChunks.push(event.data);
-                          }
-                      };
+                  mediaRecorder.ondataavailable = event => {
+                      if (event.data.size > 0) {
+                          audioChunks.push(event.data);
+                      }
+                  };
 
-                      mediaRecorder.onstop = async () => {
-                          const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                          await processAudio(audioBlob);
-                      };
+                  mediaRecorder.onstop = async () => {
+                      const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                      await processAudio(audioBlob);
+                  };
 
-                      startBtn.value = 'Stop Recording';
-                      isRecording = true;
-                      mediaRecorder.start();
+                  startBtn.value = 'Stop Recording';
+                  isRecording = true;
+                  mediaRecorder.start();
 
-                      setTimeout(() => {
-                          mediaRecorder.stop();
-                          startBtn.value = 'Start Recording';
-                          isRecording = false;
-                      }, 20000); // Stop recording after 20 seconds
-                  } catch (error) {
-                      alert('Error recording audio');
-                  }
-              } else {
-                  mediaRecorder.stop();
-                  startBtn.value = 'Start Recording';
-                  isRecording = false;
-              }
+                  setTimeout(() => {
+                      mediaRecorder.stop();
+                      startBtn.value = 'Start Recording';
+                      isRecording = false;
+                  }, 20000); // Stop recording after 20 seconds
+                } else {
+                    mediaRecorder.stop();
+                    startBtn.value = 'Start Recording';
+                    isRecording = false;
+                }
+            } catch (error) {
+              alert('Abó go Deo! Tá an Chaotharnach briste!');
+            }
           }
 
           async function processAudio(audioBlob) {

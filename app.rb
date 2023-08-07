@@ -7,11 +7,6 @@ require 'pry'
 
 enable :sessions
 
-OpenAI.configure do |config|
-  config.access_token = ENV['OPENAI_KEY']
-  config.organization_id = ENV['OPENAI_ORG']
-end
-
 set :public_folder, File.dirname(__FILE__)
 
 get '/' do
@@ -25,6 +20,7 @@ post '/forward_audio' do
   request_payload = JSON.parse(request.body.read)
   audio_blob = request_payload['audio_blob']
   response = forward_audio(audio_blob)
+  puts response
   prompt = JSON.parse(response.to_json).dig("transcriptions", 0, "utterance")
   session[:context] << { role: "user", content: prompt }
   puts prompt
@@ -33,6 +29,8 @@ post '/forward_audio' do
   puts reply
   content_type :json
   synthesize_speech(reply)
+rescue => e
+  puts e
 end
 
 def forward_audio(audio_blob)
@@ -59,13 +57,15 @@ def truncated_context
 end
 
 def chat_with_gpt
-  response = OpenAI::Client.new.chat(parameters: {
+  response = OpenAI::Client.new(access_token: ENV['OPENAI_KEY'], organization_id: ENV['OPENAI_ORG']).chat(parameters: {
     model: 'gpt-3.5-turbo',
     messages: session[:context],
     temperature: 0.5
   })
   puts response
   response.dig('choices', 0, 'message', 'content')
+rescue => e
+  "Tá aiféala orm ach tá ganntanas airgid ag cur isteach orm. Tá mo OpenAI cúntas folamh, is dóigh liom."
 end
 
 def synthesize_speech(text)
