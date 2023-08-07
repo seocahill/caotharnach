@@ -14,7 +14,7 @@ Gabh anseo https://platform.openai.com/account/api-keys agus signiú suas.
 
 Caithfidh leagan éicínt Ruby suiteáilithe agat, muna bhfuil tá treoireacha [anseo](https://www.ruby-lang.org/en/documentation/installation/).
 
-Dá mbeadh tathaí agat le Docker, bheadh sé sin níos fusa, sílim: https://hub.docker.com/_/ruby/
+Dá mbeadh tathí agat le Docker, bheadh sé sin níos fusa, sílim: https://hub.docker.com/_/ruby/
 
 
 ```shell
