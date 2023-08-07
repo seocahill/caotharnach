@@ -5,11 +5,15 @@
     <title>Speech Recognition and Text-to-Speech App</title>
   </head>
   <body>
+    <p>Sampla: "Cén t-ainm atá ort?"</p>
     <input type="button" id="startBtn" value="Start Recording">
+    <hr>
+    <ul id="conversationList"></ul>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
       $(document).ready(function() {
           const startBtn = document.getElementById('startBtn');
+          const conversationList = document.getElementById('conversationList');
           let mediaRecorder;
           let isRecording = false;
 
@@ -41,7 +45,7 @@
                           mediaRecorder.stop();
                           startBtn.value = 'Start Recording';
                           isRecording = false;
-                      }, 10000); // Stop recording after 10 seconds
+                      }, 20000); // Stop recording after 20 seconds
                   } catch (error) {
                       alert('Error recording audio');
                   }
@@ -81,10 +85,30 @@
 
                 // Play the audio
                 audio.play();
+
+                // Update converstaion
+                updateConversation()
+
             } catch (error) {
                 console.error('Error processing audio:', error);
             }
         }
+
+        async function updateConversation() {
+          try {
+              const response = await fetch('/get_context');
+              const contextData = await response.json();
+
+              // Assuming contextData is an array containing the last two context items
+              contextData.forEach(item => {
+                  const listItem = document.createElement('li');
+                  listItem.textContent = JSON.stringify(item);;
+                  conversationList.appendChild(listItem);
+              });
+          } catch (error) {
+              console.error('Error fetching context:', error);
+          }
+      }
 
         function base64ToBlob(base64) {
             const binaryString = atob(base64);

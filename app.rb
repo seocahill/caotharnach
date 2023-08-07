@@ -83,3 +83,10 @@ def synthesize_speech(text)
   response = http.request(request)
   response.body
 end
+
+get '/get_context' do
+  content_type :json
+  # Assuming contextArray is an array containing conversation history
+  $context.last(2).to_json
+end
+
