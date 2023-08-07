@@ -5,18 +5,19 @@ require 'net/http'
 require 'uri'
 require 'pry'
 
+enable :sessions
+
 OpenAI.configure do |config|
   config.access_token = ENV['OPENAI_KEY']
   config.organization_id = ENV['OPENAI_ORG']
 end
 
-$context = [
-  { role: 'system', content: "You are an Irish speaker called 'An Chaothernach'. You are chatting with another Irish speaker about everyday things, e.g. your job, your family, holidays, the news, the weather, etc." }
-]
-
 set :public_folder, File.dirname(__FILE__)
 
 get '/' do
+  session[:context] = [
+    { role: 'system', content: "You are an Irish speaker called 'An Chaothernach'. You are chatting with another Irish speaker about everyday things, e.g. your job, your family, holidays, the news, the weather, etc." }
+  ]
   erb :index
 end
 
@@ -25,10 +26,10 @@ post '/forward_audio' do
   audio_blob = request_payload['audio_blob']
   response = forward_audio(audio_blob)
   prompt = JSON.parse(response.to_json).dig("transcriptions", 0, "utterance")
-  $context << { role: "user", content: prompt }
+  session[:context] << { role: "user", content: prompt }
   puts prompt
   reply = chat_with_gpt
-  $context << { role: "assistant", content: reply }
+  session[:context] << { role: "assistant", content: reply }
   puts reply
   content_type :json
   synthesize_speech(reply)
@@ -54,13 +55,13 @@ def forward_audio(audio_blob)
 end
 
 def truncated_context
-  $context.last(10).join('\n')
+  session[:context].last(10).join('\n')
 end
 
 def chat_with_gpt
   response = OpenAI::Client.new.chat(parameters: {
     model: 'gpt-3.5-turbo',
-    messages: $context,
+    messages: session[:context],
     temperature: 0.5
   })
   puts response
@@ -87,6 +88,6 @@ end
 get '/get_context' do
   content_type :json
   # Assuming contextArray is an array containing conversation history
-  $context.last(2).to_json
+  session[:context].last(2).to_json
 end
 
