@@ -10,7 +10,7 @@
     <main>
       <h1>Cuir ceist ar an gCaotharnach!</h1>
       <p>Sampla: "Cén t-ainm atá ort?"</p>
-      <input type="button" id="startBtn" value="Start Recording">
+      <input type="button" id="startBtn" value="Labhair">
       <hr>
       <h2>Comhrá</h2>
       <ul id="conversationList"></ul>
@@ -50,18 +50,18 @@
                       await processAudio(audioBlob);
                   };
 
-                  startBtn.value = 'Stop Recording';
+                  startBtn.value = 'Stop';
                   isRecording = true;
                   mediaRecorder.start();
 
                   setTimeout(() => {
                       mediaRecorder.stop();
-                      startBtn.value = 'Start Recording';
+                      startBtn.value = 'Labhair';
                       isRecording = false;
                   }, 20000); // Stop recording after 20 seconds
                 } else {
                     mediaRecorder.stop();
-                    startBtn.value = 'Start Recording';
+                    startBtn.value = 'Labhair';
                     isRecording = false;
                 }
             } catch (error) {
