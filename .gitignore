@@ -4,7 +4,6 @@
 *.swp
 *.rbc
 /pkg
-/Gemfile.lock
 /coverage
 .yardoc
 /doc
