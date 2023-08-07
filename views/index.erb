@@ -46,8 +46,11 @@
                   };
 
                   mediaRecorder.onstop = async () => {
+                      // in case user tries to record again while waiting on response
+                      startBtn.disabled = true;
                       const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
                       await processAudio(audioBlob);
+                      startBtn.disabled = false;
                   };
 
                   startBtn.value = 'Stop';
@@ -66,6 +69,7 @@
                 }
             } catch (error) {
               alert('Abó go Deo! Tá an Chaotharnach briste!');
+              startBtn.disabled = false;
             }
           }
 
