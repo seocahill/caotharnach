@@ -3,16 +3,20 @@
 <html>
   <head>
     <title>Speech Recognition and Text-to-Speech App</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="https://unpkg.com/mvp.css">
   </head>
   <body>
-    <h1>Cuir ceist ar an gCaotharnach!</h1>
-    <p>Sampla: "Cén t-ainm atá ort?"</p>
-    <input type="button" id="startBtn" value="Start Recording">
-    <hr>
-    <h2>Debug</h2>
-    <ul id="conversationList"></ul>
-    <button onClick="window.location.reload();">Glan an comhrá</button>
-    <hr>
+    <main>
+      <h1>Cuir ceist ar an gCaotharnach!</h1>
+      <p>Sampla: "Cén t-ainm atá ort?"</p>
+      <input type="button" id="startBtn" value="Start Recording">
+      <hr>
+      <h2>Comhrá</h2>
+      <ul id="conversationList"></ul>
+      <input type="button" onClick="window.location.reload();" value="Glan an comhrá">
+      <hr>
+    </main>
     <footer>
       <p>
         <a href="https://github.com/seocahill/caotharnach">Fórc anseo.</a>
