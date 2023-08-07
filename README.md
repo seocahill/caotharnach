@@ -12,6 +12,10 @@ Tá an OpenAi api an-costasach! Dá bhforcfhá an togra seo, bí cúramach go gc
 
 Gabh anseo https://platform.openai.com/account/api-keys agus signiú suas.
 
+Caithfidh leagan éicínt Ruby suiteáilithe agat, muna bhfuil tá treoireacha [anseo](https://www.ruby-lang.org/en/documentation/installation/).
+
+Dá mbeadh tathaí agat le Docker, bheadh sé sin níos fusta, sílim: https://hub.docker.com/_/ruby/
+
 
 ```shell
 # clón an togra
@@ -23,6 +27,12 @@ cd caotharnach
 # cuir do fáisnéis isteach sa blaosc
 export OPENAI_KEY="<do-eochair-openai>"
 export OPENAI_ORG="<do-org-id-openai>"
+
+# bhfuil ruby agat?
+ruby -v
+
+# suiteáil na spleáchais
+bundle install
 
 # toisigh an friothálaí
 rackup
