@@ -16,6 +16,15 @@
       <ul id="conversationList"></ul>
       <input type="button" onClick="window.location.reload();" value="Glan an comhrá">
       <hr>
+      <h2>Comhthéacs</h2>
+      <details>
+        <summary>Taispáin</summary>
+        <i>Sa trialacha a ndearna mé, oibríonn treoracha i mBéarla níos fearr. Níl a fhios agam cén fáth.</i>
+        <form action="/set_context" method="post">
+        <textarea name="context" id="context" cols="30" rows="10"><%= @context %></textarea>
+        <input type="submit" value="Athraigh an comhthéacs">
+      </form>
+      </details>
     </main>
     <footer>
       <p>
@@ -48,9 +57,11 @@
                   mediaRecorder.onstop = async () => {
                       // in case user tries to record again while waiting on response
                       startBtn.disabled = true;
+                      startBtn.value = "..ag smaoineamh.."
                       const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
                       await processAudio(audioBlob);
                       startBtn.disabled = false;
+                      startBtn.value = "Labhair"
                   };
 
                   startBtn.value = 'Stop';

@@ -10,10 +10,19 @@ enable :sessions
 set :public_folder, File.dirname(__FILE__)
 
 get '/' do
-  session[:context] = [
-    { role: 'system', content: "You are an Irish speaker called 'An Chaothernach'. You are chatting with another Irish speaker about everyday things, e.g. your job, your family, holidays, the news, the weather, etc." }
+  session[:context] ||= [
+    { role: 'system', content: "You are an Irish speaker called 'An Chaothernach'. You are chatting with another Irish speaker about everyday things, e.g. your job, your family, holidays, the news, the weather, hobbies, etc. Try not to give long answers. If you don't understand, say it." }
   ]
+  @context = session[:context].detect { |line| line[:role] == 'system' }.dig(:content)
+  puts @context
   erb :index
+end
+
+post '/set_context' do
+  session[:context] ||= [
+    { role: 'system', content: params["context"] }
+  ]
+  redirect '/'
 end
 
 post '/forward_audio' do
@@ -22,6 +31,7 @@ post '/forward_audio' do
   response = forward_audio(audio_blob)
   puts response
   prompt = JSON.parse(response.to_json).dig("transcriptions", 0, "utterance")
+  puts prompt
   session[:context] << { role: "user", content: prompt }
   puts prompt
   reply = chat_with_gpt
