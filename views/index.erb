@@ -25,12 +25,19 @@
       <ul id="conversationList"></ul>
       <input type="button" onClick="window.location.reload();" value="Glan an comhrá">
       <hr>
-      <h2>Comhthéacs</h2>
+      <h2>Socruithe</h2>
       <details>
         <summary>Taispeáin</summary>
         <i>Sa trialacha a ndearna mé, oibríonn treoracha i mBéarla níos fearr. Níl a fhios agam cén fáth.</i>
         <form action="/set_context" method="post">
+        <label for="context">Comhthéacs:</label>
         <textarea name="context" id="context" cols="30" rows="10"><%= @context %></textarea>
+        <label for="guth">Sórt Guth:</label>
+        <select id="guth" name="guth">
+          <option value="ga_UL_anb_nemo" selected>Tír Chonaill</option>
+          <option value="ga_CO_snc_nemo">Cois Fharraige</option>
+          <option value="ga_MU_nnc_nemo">Cíarraí</option>
+        </select>
         <input type="submit" value="Athraigh an comhthéacs">
       </form>
       </details>

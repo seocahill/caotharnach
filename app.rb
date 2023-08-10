@@ -13,15 +13,17 @@ get '/' do
   session[:context] ||= [
     { role: 'system', content: "You are an Irish speaker called 'An Chaothernach'. You are chatting with another Irish speaker about everyday things, e.g. your job, your family, holidays, the news, the weather, hobbies, etc. Try not to give long answers. If you don't understand, say it." }
   ]
+  session[:guth] = 'ga_UL_anb_nemo'
   @context = session[:context].detect { |line| line[:role] == 'system' }.dig(:content)
   puts @context
   erb :index
 end
 
 post '/set_context' do
-  session[:context] ||= [
+  session[:context] = [
     { role: 'system', content: params["context"] }
   ]
+  session[:guth] = params["guth"]
   redirect '/'
 end
 
@@ -79,14 +81,13 @@ rescue => e
 end
 
 def synthesize_speech(text)
-  # Replace with your actual API endpoint and logic for speech synthesis
   uri = URI.parse('https://abair.ie/api2/synthesise')
   http = Net::HTTP.new(uri.host, uri.port)
   http.use_ssl = true
   request = Net::HTTP::Post.new(uri.path)
   request.body = {
     synthinput: { text: text, ssml: 'string' },
-    voiceparams: { languageCode: 'ga-IE', name: 'ga_UL_anb_nemo', ssmlGender: 'UNSPECIFIED' },
+    voiceparams: { languageCode: 'ga-IE', name: session[:guth], ssmlGender: 'UNSPECIFIED' },
     audioconfig: { audioEncoding: 'LINEAR16', speakingRate: 1, pitch: 1, volumeGainDb: 1 },
     outputType: 'JSON'
   }.to_json
