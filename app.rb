@@ -13,9 +13,10 @@ get '/' do
   session[:context] ||= [
     { role: 'system', content: "You are an Irish speaker called 'An Chaothernach'. You are chatting with another Irish speaker about everyday things, e.g. your job, your family, holidays, the news, the weather, hobbies, etc. Try not to give long answers. If you don't understand, say it." }
   ]
-  session[:guth] = 'ga_UL_anb_nemo'
+  session[:guth] ||= 'ga_UL_anb_nemo'
   @context = session[:context].detect { |line| line[:role] == 'system' }.dig(:content)
-  puts @context
+  @guth = session[:guth]
+  puts @context, @guth
   erb :index
 end
 
@@ -24,6 +25,7 @@ post '/set_context' do
     { role: 'system', content: params["context"] }
   ]
   session[:guth] = params["guth"]
+  puts params
   redirect '/'
 end
 
