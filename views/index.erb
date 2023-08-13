@@ -22,7 +22,7 @@
       <input type="button" id="startBtn" value="Labhair">
       <hr>
       <h2>Comhrá</h2>
-      <ul id="conversationList"></ul>
+      <dl id="conversationList"></dl>
       <input type="button" onClick="window.location.reload();" value="Glan an comhrá">
       <hr>
       <h2>Socruithe</h2>
@@ -144,9 +144,16 @@
 
               // Assuming contextData is an array containing the last two context items
               contextData.forEach(item => {
-                  const listItem = document.createElement('li');
-                  listItem.textContent = JSON.stringify(item);;
-                  conversationList.appendChild(listItem);
+                  const title = document.createElement('dt');
+                  const data = document.createElement('dd');
+                  data.textContent = item.content;
+                  if (item.role === 'user') {
+                    title.textContent = "Tusa:"
+                  } else {
+                    title.textContent = "Sise:"
+                  }
+                  conversationList.appendChild(title);
+                  conversationList.appendChild(data);
               });
           } catch (error) {
               console.error('Error fetching context:', error);
@@ -185,5 +192,18 @@
         }
     });
     </script>
+    <style>
+      dl {
+        display: grid;
+        grid-template-columns: max-content auto;
+      }
+      dt {
+        grid-column-start: 1;
+        font-style: italic;
+      }
+      dd {
+        grid-column-start: 2;
+      }
+    </style>
   </body>
 </html>
