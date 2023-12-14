@@ -72,7 +72,7 @@ end
 
 def chat_with_gpt
   response = OpenAI::Client.new(access_token: ENV['OPENAI_KEY'], organization_id: ENV['OPENAI_ORG']).chat(parameters: {
-    model: 'gpt-3.5-turbo',
+    model: 'gpt-4-1106-preview',
     messages: session[:context],
     temperature: 0.5
   })
@@ -103,4 +103,3 @@ get '/get_context' do
   # Assuming contextArray is an array containing conversation history
   session[:context].last(2).to_json
 end
-
