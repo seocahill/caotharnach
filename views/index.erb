@@ -162,12 +162,15 @@
             const data = await response.json();
             const audioContent = data.audioContent;
 
+            // Add user's message to conversation
+            console.log(data)
+            addMessageToConversation('Tusa:', data.userText);
+
             // Play the audio response
             const audio = new Audio("data:audio/wav;base64," + audioContent);
             audio.play();
 
-            // Add messages to conversation
-            addMessageToConversation('Tusa:', data.userText);
+            // Add chatbot's message to conversation
             addMessageToConversation('Sise:', data.aiText);
 
             // Reset button text
