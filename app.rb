@@ -33,14 +33,14 @@ post '/forward_audio' do
   request_payload = JSON.parse(request.body.read)
   audio_blob = request_payload['audio_blob']
   response = forward_audio(audio_blob)
-  puts response
+  # puts response
   prompt = JSON.parse(response.to_json).dig("transcriptions", 0, "utterance")
-  puts prompt
+  # puts prompt
   session[:context] << { role: "user", content: prompt }
-  puts prompt
+  # puts prompt
   reply = chat_with_gpt
   session[:context] << { role: "assistant", content: reply }
-  puts reply
+  # puts reply
   content_type :json
   synthesize_speech(reply)
 rescue => e
@@ -76,7 +76,7 @@ def chat_with_gpt
     messages: session[:context],
     temperature: 0.5
   })
-  puts response
+  # puts response
   response.dig('choices', 0, 'message', 'content')
 rescue => e
   "Tá aiféala orm ach tá ganntanas airgid ag cur isteach orm. Tá mo OpenAI cúntas folamh, is dóigh liom."
@@ -101,5 +101,9 @@ end
 get '/get_context' do
   content_type :json
   # Assuming contextArray is an array containing conversation history
+  puts "===================="
+  puts session[:context].last(2)
+    puts "===================="
+
   session[:context].last(2).to_json
 end
