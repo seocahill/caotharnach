@@ -64,7 +64,8 @@
 
         let isRecording = false;
         let mediaRecorder;
-        let hasHungUp = false; // New variable to track if hang up has been triggered
+        let hasHungUp = false;
+        let stream;
 
         async function toggleRecording() {
           if (!isRecording) {
@@ -77,7 +78,7 @@
         }
 
         async function startRecording() {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           mediaRecorder = new MediaRecorder(stream);
           const audioContext = new AudioContext();
           const source = audioContext.createMediaStreamSource(stream);
@@ -149,6 +150,12 @@
             isRecording = false;
             recordBtn.textContent = 'Ag Fanacht ar Freagra...';
           }
+
+          // Stop all media tracks to release the microphone
+         if (stream) {
+             stream.getTracks().forEach(track => track.stop());
+             stream = null;
+         }
         }
 
         async function processAudio(audioBlob) {
