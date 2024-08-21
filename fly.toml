@@ -7,7 +7,7 @@ mounts = []
 processes = []
 
 [build]
-  builder = "heroku/buildpacks:20"
+  builder = "heroku/builder:24"
 
 [env]
   PORT = "8080"
