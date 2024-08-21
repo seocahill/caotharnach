@@ -33,9 +33,9 @@ post '/forward_audio' do
   request_payload = JSON.parse(request.body.read)
   audio_blob = request_payload['audio_blob']
   response = forward_audio(audio_blob)
-  # puts response
+  puts response
   prompt = JSON.parse(response.to_json).dig("transcriptions", 0, "utterance")
-  # puts prompt
+  puts prompt
   session[:context] << { role: "user", content: prompt }
   # puts prompt
   reply = chat_with_gpt
