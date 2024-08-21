@@ -27,7 +27,7 @@
         <div id="inputContainer">
           <button id="recordBtn">Toisigh</button>
           <button id="hangUpBtn" style="display:none;">Druid</button>
-          <button id="glanBtn" onClick="window.location.reload();">Glan</button>
+          <button id="glanBtn">Glan</button>
         </div>
       </div>
       <hr>
@@ -63,6 +63,8 @@
 
         recordBtn.addEventListener('click', toggleRecording);
         hangUpBtn.addEventListener('click', hangUp);
+        glanBtn.addEventListener('click', clearConversation);
+
 
         let isRecording = false;
         let mediaRecorder;
@@ -180,14 +182,16 @@
 
             const data = await response.json();
             const audioContent = data.audioContent;
+            const userMessage = data.tusa;
+            const assistantMessage = data.sise;
 
             // Play the audio response
             const audio = new Audio("data:audio/wav;base64," + audioContent);
             audio.play();
 
 
-            // Update conversation from server
-            await updateConversation();
+            // Update conversation
+            updateConversation(userMessage, assistantMessage);
 
             // Reset button text
             recordBtn.textContent = 'Toisigh';
@@ -204,30 +208,32 @@
           }
         }
 
-        async function updateConversation() {
-          try {
-            const response = await fetch('/get_context');
-            const contextData = await response.json();
+        function updateConversation(userMessage, assistantMessage) {
+          // Add user message
+          const userTitle = document.createElement('dt');
+          const userData = document.createElement('dd');
+          userTitle.textContent = "Tusa:";
+          userData.textContent = userMessage;
+          conversationList.appendChild(userTitle);
+          conversationList.appendChild(userData);
 
-            // Assuming contextData is an array containing the last two context items
-            contextData.forEach(item => {
-              if (item.content) { // Check if content is not empty
-                const title = document.createElement('dt');
-                const data = document.createElement('dd');
-                data.textContent = item.content;
-                if (item.role === 'user') {
-                  title.textContent = "Tusa:";
-                } else {
-                  title.textContent = "Sise:";
-                }
-                conversationList.appendChild(title);
-                conversationList.appendChild(data);
-              }
-            });
-            conversationList.scrollTop = conversationList.scrollHeight;
-          } catch (error) {
-            console.error('Error fetching context:', error);
-          }
+          // Add assistant message
+          const assistantTitle = document.createElement('dt');
+          const assistantData = document.createElement('dd');
+          assistantTitle.textContent = "Sise:";
+          assistantData.textContent = assistantMessage;
+          conversationList.appendChild(assistantTitle);
+          conversationList.appendChild(assistantData);
+
+          // Save conversation to localStorage
+          localStorage.setItem('conversation', conversationList.innerHTML);
+
+          // Auto-scroll to the bottom
+          conversationList.scrollTop = conversationList.scrollHeight;
+        }
+
+        function clearConversation() {
+          window.location.href = '/reset'; // Navigate to reset path
         }
 
         async function blobToBase64(blob) {

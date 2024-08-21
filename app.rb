@@ -20,6 +20,12 @@ get '/' do
   erb :index
 end
 
+get '/reset' do
+  session.clear
+  puts "clearning session"
+  redirect '/'
+end
+
 post '/set_context' do
   session[:context] = [
     { role: 'system', content: params["context"] }
@@ -42,7 +48,10 @@ post '/forward_audio' do
   session[:context] << { role: "assistant", content: reply }
   # puts reply
   content_type :json
-  synthesize_speech(reply)
+  payload = JSON.parse(synthesize_speech(reply))
+  payload["tusa"] = prompt
+  payload["sise"] = reply
+  payload.to_json
 rescue => e
   puts e
 end
