@@ -15,7 +15,7 @@
       <details open>
         <summary>Treoracha / instructions</summary>
         <ol>
-          <li>Hit "Tosaigh" to start the voice chat.</li>
+          <li>Hit "Toisigh" to start the voice chat.</li>
           <li>Hit "Druid" to close the chat.</li>
           <li>Hit "Glan" to reset the chat history.</li>
           <li>You can change the default prompt and voice by going to "Socruithe", hitting "Taispeáin" and finally "Athraigh". </li>
@@ -25,7 +25,7 @@
       <div id="chatContainer">
         <div id="conversationList"></div>
         <div id="inputContainer">
-          <button id="recordBtn">Tosaigh</button>
+          <button id="recordBtn">Toisigh</button>
           <button id="hangUpBtn" style="display:none;">Druid</button>
           <button id="glanBtn" onClick="window.location.reload();">Glan</button>
         </div>
@@ -190,7 +190,7 @@
             await updateConversation();
 
             // Reset button text
-            recordBtn.textContent = 'Tosaigh';
+            recordBtn.textContent = 'Toisigh';
 
             // Automatically start recording again after the response is played
             audio.onended = () => {
@@ -200,7 +200,7 @@
             };
           } catch (error) {
             console.error('Error processing audio:', error);
-            recordBtn.textContent = 'Tosaigh';
+            recordBtn.textContent = 'Toisigh';
           }
         }
 
@@ -245,7 +245,7 @@
           }
           hasHungUp = true;
           hangUpBtn.style.display = 'none';
-          recordBtn.textContent = 'Tosaigh';
+          recordBtn.textContent = 'Toisigh';
           glanBtn.style.display = 'inline'
           recordBtn.style.backgroundColor = '';
         }
