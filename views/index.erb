@@ -54,7 +54,7 @@
     </footer>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
-       $(document).ready(function() {
+      $(document).ready(function() {
         const conversationList = document.getElementById('conversationList');
         const recordBtn = document.getElementById('recordBtn');
         const hangUpBtn = document.getElementById('hangUpBtn');
@@ -64,11 +64,13 @@
 
         let isRecording = false;
         let mediaRecorder;
+        let hasHungUp = false; // New variable to track if hang up has been triggered
 
         async function toggleRecording() {
           if (!isRecording) {
             startRecording();
             hangUpBtn.style.display = 'inline';
+            hasHungUp = false;
           } else {
             stopRecording();
           }
@@ -150,6 +152,10 @@
         }
 
         async function processAudio(audioBlob) {
+          if (hasHungUp) {
+              console.log('Hang up detected, skipping audio processing');
+              return; // Prevent further processing if the user has hung up
+          }
           try {
             const audioString = await blobToBase64(audioBlob);
             const response = await fetch('/forward_audio', {
@@ -167,8 +173,6 @@
             const audio = new Audio("data:audio/wav;base64," + audioContent);
             audio.play();
 
-            // Add messages to conversation
-
 
             // Update conversation from server
             await updateConversation();
@@ -178,7 +182,7 @@
 
             // Automatically start recording again after the response is played
             audio.onended = () => {
-              if (!isRecording) {
+              if (!isRecording && !hasHungUp) {
                 startRecording();
               }
             };
@@ -226,6 +230,7 @@
           if (isRecording) {
             stopRecording();
           }
+          hasHungUp = true;
           hangUpBtn.style.display = 'none';
           recordBtn.textContent = 'Tosaigh Comhrá';
         }
