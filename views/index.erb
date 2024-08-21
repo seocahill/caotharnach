@@ -11,15 +11,15 @@
   <body>
     <main>
       <h1>Cuir ceist ar an gCaotharnach!</h1>
+      <p>Have a voice chat with "open" ai.</p>
       <details open>
-        <summary>Treoracha</summary>
+        <summary>Treoracha / instructions</summary>
         <ol>
-          <li>Brúigh an "Labhair" cnaipe</li>
-          <li>Abair rud éicint, mar shampla: "Cén t-ainm atá ort?"</li>
-          <li>Brúigh an "Stop" cnaipe</li>
-          <li>Freagóidh an Caotharnach!</li>
+          <li>Hit "Tosaigh" to start the voice chat.</li>
+          <li>Hit "Druid" to close the chat.</li>
+          <li>Hit "Glan" to reset the chat history.</li>
+          <li>You can change the default prompt and voice by going to "Socruithe", hitting "Taispeáin" and finally "Athraigh". </li>
         </ol>
-        <a href="https://assets.abairt.com/coatharnach-demo.mp4" target="_blank">Dearc ar físeán</a>
       </details>
       <h2>Comhrá</h2>
       <div id="chatContainer">
@@ -58,6 +58,8 @@
         const conversationList = document.getElementById('conversationList');
         const recordBtn = document.getElementById('recordBtn');
         const hangUpBtn = document.getElementById('hangUpBtn');
+        const glanBtn = document.getElementById('glanBtn');
+
 
         recordBtn.addEventListener('click', toggleRecording);
         hangUpBtn.addEventListener('click', hangUp);
@@ -71,6 +73,7 @@
           if (!isRecording) {
             startRecording();
             hangUpBtn.style.display = 'inline';
+            glanBtn.style.display = 'none';
             hasHungUp = false;
           } else {
             stopRecording();
@@ -126,6 +129,7 @@
             console.log('Recording started');
             isRecording = true;
             recordBtn.textContent = 'Ag Éisteacht...';
+            recordBtn.style.backgroundColor = 'red';
             detectSilence();
           };
 
@@ -149,6 +153,7 @@
             mediaRecorder.stop();
             isRecording = false;
             recordBtn.textContent = 'Ag Fanacht ar Freagra...';
+            recordBtn.style.backgroundColor = 'green'
           }
 
           // Stop all media tracks to release the microphone
@@ -185,7 +190,7 @@
             await updateConversation();
 
             // Reset button text
-            recordBtn.textContent = 'Tosaigh Comhrá';
+            recordBtn.textContent = 'Tosaigh';
 
             // Automatically start recording again after the response is played
             audio.onended = () => {
@@ -195,7 +200,7 @@
             };
           } catch (error) {
             console.error('Error processing audio:', error);
-            recordBtn.textContent = 'Tosaigh Comhrá';
+            recordBtn.textContent = 'Tosaigh';
           }
         }
 
@@ -240,7 +245,9 @@
           }
           hasHungUp = true;
           hangUpBtn.style.display = 'none';
-          recordBtn.textContent = 'Tosaigh Comhrá';
+          recordBtn.textContent = 'Tosaigh';
+          glanBtn.style.display = 'inline'
+          recordBtn.style.backgroundColor = '';
         }
       });
     </script>
@@ -265,10 +272,14 @@
       }
       @media (max-width: 600px) {
         #chatContainer {
-          height: 300px; /* Adjust height for smaller screens */
+          height: 40vh; /* Increase height for smaller screens */
         }
         #inputContainer {
           flex-direction: column; /* Stack buttons vertically on smaller screens */
+        }
+        #inputContainer button {
+          width: 100%; /* Make buttons full width */
+          padding: 10px; /* Adjust padding for smaller buttons */
         }
       }
     </style>
