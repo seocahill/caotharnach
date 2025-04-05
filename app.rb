@@ -93,7 +93,7 @@ rescue => e
 end
 
 def synthesize_speech(text)
-  uri = URI.parse('https://api.abair.ie/v3/synthesise')
+  uri = URI.parse('https://api.abair.ie/v3/synthesis')
   http = Net::HTTP.new(uri.host, uri.port)
   http.use_ssl = true
   http.verify_mode = OpenSSL::SSL::VERIFY_NONE
