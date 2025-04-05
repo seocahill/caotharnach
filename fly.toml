@@ -12,6 +12,9 @@ processes = []
 [env]
   PORT = "8080"
 
+[deploy]
+  release_command = "bundle exec rackup -p 8080"
+
 [[services]]
   internal_port = 8080
   processes = ["app"]

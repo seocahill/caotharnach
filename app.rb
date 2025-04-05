@@ -8,6 +8,7 @@ require 'pry'
 enable :sessions
 
 set :public_folder, File.dirname(__FILE__)
+set :port, ENV['PORT'] || 8080
 
 get '/' do
   session[:context] ||= [
