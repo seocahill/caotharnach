@@ -14,7 +14,7 @@ get '/' do
   session[:context] ||= [
     { role: 'system', content: "You are an Irish speaker called 'An Chaothernach'. You are chatting with another Irish speaker about everyday things, e.g. your job, your family, holidays, the news, the weather, hobbies, etc. Try not to give long answers. If you don't understand, say it." }
   ]
-  session[:guth] ||= 'ga_UL_anb_nemo'
+  session[:guth] ||= 'ga_UL_anb_piper'
   @context = session[:context].detect { |line| line[:role] == 'system' }.dig(:content)
   @guth = session[:guth]
   puts @context, @guth
@@ -96,12 +96,21 @@ def synthesize_speech(text)
   uri = URI.parse('https://api.abair.ie/v3/synthesis')
   http = Net::HTTP.new(uri.host, uri.port)
   http.use_ssl = true
+  # Disable SSL verification for this specific request
   http.verify_mode = OpenSSL::SSL::VERIFY_NONE
   request = Net::HTTP::Post.new(uri.path)
   request.body = {
     synthinput: { text: text, ssml: 'string' },
     voiceparams: { languageCode: 'ga-IE', name: session[:guth], ssmlGender: 'UNSPECIFIED' },
-    audioconfig: { audioEncoding: 'LINEAR16', speakingRate: 1, pitch: 1, volumeGainDb: 1 },
+    audioconfig: {
+      audioEncoding: 'LINEAR16',
+      speakingRate: 1,
+      pitch: 1,
+      volumeGainDb: 1,
+      htsParams: 'string',
+      sampleRateHertz: 0,
+      effectsProfileId: []
+    },
     outputType: 'JSON'
   }.to_json
   request['Content-Type'] = 'application/json'
