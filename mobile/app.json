@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Oileáin",
+    "slug": "oileain",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1a5f2a"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ie.oileain.app",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "We need access to your microphone to record your voice for creating Irish language islands."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1a5f2a"
+      },
+      "package": "ie.oileain.app",
+      "permissions": ["android.permission.RECORD_AUDIO"]
+    },
+    "plugins": [
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow Oileáin to access your microphone for voice recording."
+        }
+      ]
+    ]
+  }
+}
