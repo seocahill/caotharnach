@@ -66,6 +66,48 @@ export const api = {
     const data = await response.json();
     return data.transcription;
   },
+
+  // Transcribe English audio (for expansion refinements)
+  async transcribeEnglish(audioBase64: string): Promise<string> {
+    const response = await fetch(`${API_BASE}/api/asr/english`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        audio_blob: audioBase64,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to transcribe English');
+    }
+
+    const data = await response.json();
+    return data.transcription;
+  },
+
+  // Expand an existing island with more sentences
+  async expandIsland(island: Island, refinement: string): Promise<Sentence[]> {
+    const response = await fetch(`${API_BASE}/api/islands/${island.id}/expand`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        island: island,
+        refinement: refinement,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to expand island: ${error}`);
+    }
+
+    const data = await response.json();
+    return data.sentences;
+  },
 };
 
 export const setApiBase = (url: string) => {

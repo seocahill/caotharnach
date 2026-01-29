@@ -6,23 +6,34 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  TextInput,
+  Alert,
 } from 'react-native';
-import { useAudioPlayer, AudioSource } from 'expo-audio';
+import { useAudioPlayer, AudioSource, useAudioRecorder, useAudioRecorderState, AudioModule, RecordingPresets } from 'expo-audio';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
 import { RootStackParamList } from '../../App';
-import { Sentence } from '../types/island';
+import { Sentence, Island } from '../types/island';
 import { api } from '../services/api';
+import { storage } from '../services/storage';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'StudyIsland'>;
 
-export function StudyIslandScreen({ route }: Props) {
-  const { island } = route.params;
+export function StudyIslandScreen({ route, navigation }: Props) {
+  const { island: initialIsland } = route.params;
+  const [island, setIsland] = useState<Island>(initialIsland);
   const [expandedSentences, setExpandedSentences] = useState<Set<string>>(new Set());
   const [playingSentence, setPlayingSentence] = useState<string | null>(null);
   const [loadingAudio, setLoadingAudio] = useState<string | null>(null);
+  const [showExpandInput, setShowExpandInput] = useState(false);
+  const [refinementText, setRefinementText] = useState('');
+  const [isExpanding, setIsExpanding] = useState(false);
+  const [useVoiceInput, setUseVoiceInput] = useState(true);
+  const [isRecording, setIsRecording] = useState(false);
   const audioPlayer = useAudioPlayer();
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(audioRecorder);
 
   const toggleTranslation = (sentenceId: string) => {
     setExpandedSentences(prev => {
@@ -100,6 +111,94 @@ export function StudyIslandScreen({ route }: Props) {
     }
   };
 
+  const startRecording = async () => {
+    try {
+      const status = await AudioModule.requestRecordingPermissionsAsync();
+      if (!status.granted) {
+        Alert.alert('Cead ag teastáil', 'Tá cead micreafón ag teastáil chun fuaim a thaifeadadh.');
+        return;
+      }
+
+      await audioRecorder.prepareToRecordAsync();
+      audioRecorder.record();
+      setIsRecording(true);
+    } catch (error) {
+      console.error('Failed to start recording:', error);
+      Alert.alert('Earráid', 'Níorbh fhéidir taifeadadh a thosú');
+    }
+  };
+
+  const stopRecording = async () => {
+    if (!recorderState.isRecording) return;
+
+    setIsRecording(false);
+    setIsExpanding(true);
+
+    try {
+      await audioRecorder.stop();
+      const uri = audioRecorder.uri;
+
+      if (!uri) {
+        throw new Error('No recording URI');
+      }
+
+      // Read and convert to base64
+      const audioBase64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      // Clean up temp file
+      await FileSystem.deleteAsync(uri, { idempotent: true });
+
+      // Transcribe to get refinement text
+      const transcription = await api.transcribeEnglish(audioBase64);
+      setRefinementText(transcription);
+
+      // Switch to text mode so user can edit if needed
+      setUseVoiceInput(false);
+      setIsExpanding(false);
+    } catch (error) {
+      console.error('Failed to process recording:', error);
+      Alert.alert('Earráid', 'Níorbh fhéidir an taifeadadh a phróiseáil');
+      setIsExpanding(false);
+    }
+  };
+
+  const handleExpandIsland = async () => {
+    if (!refinementText.trim()) {
+      Alert.alert('Téacs ag teastáil', 'Scríobh cad ba mhaith leat a fhoghlaim');
+      return;
+    }
+
+    setIsExpanding(true);
+    try {
+      const newSentences = await api.expandIsland(island, refinementText);
+
+      // Update island with new sentences
+      const updatedIsland: Island = {
+        ...island,
+        sentences: [...island.sentences, ...newSentences],
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Save to storage
+      await storage.saveIsland(updatedIsland);
+
+      // Update local state
+      setIsland(updatedIsland);
+      setRefinementText('');
+      setShowExpandInput(false);
+      setUseVoiceInput(true);
+
+      Alert.alert('Déanta!', `${newSentences.length} abairt nua curtha leis`);
+    } catch (error) {
+      console.error('Failed to expand island:', error);
+      Alert.alert('Earráid', 'Níorbh fhéidir an t-oileán a leathnú');
+    } finally {
+      setIsExpanding(false);
+    }
+  };
+
   const renderSentence = (sentence: Sentence, index: number) => {
     const isExpanded = expandedSentences.has(sentence.id);
     const isPlaying = playingSentence === sentence.id;
@@ -164,6 +263,116 @@ export function StudyIslandScreen({ route }: Props) {
           <Text style={styles.playAllText}>Seinn gach ceann</Text>
         </TouchableOpacity>
 
+        {/* Expand island button */}
+        {!showExpandInput ? (
+          <TouchableOpacity
+            style={styles.expandButton}
+            onPress={() => setShowExpandInput(true)}
+          >
+            <Ionicons name="add-circle-outline" size={20} color="#1a5f2a" />
+            <Text style={styles.expandButtonText}>Cuir tuilleadh leis</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.expandInputContainer}>
+            {/* Toggle between voice and text */}
+            <TouchableOpacity
+              style={styles.toggleInput}
+              onPress={() => {
+                setUseVoiceInput(!useVoiceInput);
+                setRefinementText('');
+              }}
+            >
+              <Ionicons
+                name={useVoiceInput ? 'text' : 'mic'}
+                size={18}
+                color="#1a5f2a"
+              />
+              <Text style={styles.toggleInputText}>
+                {useVoiceInput ? 'Úsáid téacs' : 'Úsáid guth'}
+              </Text>
+            </TouchableOpacity>
+
+            {useVoiceInput ? (
+              // Voice recording
+              <View style={styles.voiceInputSection}>
+                <Text style={styles.voiceHintText}>
+                  {isRecording
+                    ? 'Ag éisteacht... Déan cur síos i mBéarla'
+                    : 'Brúigh an cnaipe chun cur síos a dhéanamh i mBéarla'}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.recordButton, isRecording && styles.recordButtonActive]}
+                  onPress={isRecording ? stopRecording : startRecording}
+                  disabled={isExpanding}
+                >
+                  {isExpanding ? (
+                    <ActivityIndicator size="large" color="#fff" />
+                  ) : (
+                    <Ionicons
+                      name={isRecording ? 'stop' : 'mic'}
+                      size={32}
+                      color="#fff"
+                    />
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => {
+                    setShowExpandInput(false);
+                    setRefinementText('');
+                    setUseVoiceInput(true);
+                    if (isRecording) {
+                      audioRecorder.stop();
+                      setIsRecording(false);
+                    }
+                  }}
+                >
+                  <Text style={styles.cancelButtonText}>Cealaigh</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              // Text input
+              <View style={styles.textInputSection}>
+                <TextInput
+                  style={styles.expandInput}
+                  placeholder="E.g., 'I'd like to talk about food' or 'How would I ask about the weather?'"
+                  value={refinementText}
+                  onChangeText={setRefinementText}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                />
+                <View style={styles.expandButtonsRow}>
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={() => {
+                      setShowExpandInput(false);
+                      setRefinementText('');
+                      setUseVoiceInput(true);
+                    }}
+                  >
+                    <Text style={styles.cancelButtonText}>Cealaigh</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.submitButton, !refinementText.trim() && styles.submitButtonDisabled]}
+                    onPress={handleExpandIsland}
+                    disabled={isExpanding || !refinementText.trim()}
+                  >
+                    {isExpanding ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <>
+                        <Ionicons name="add" size={20} color="#fff" />
+                        <Text style={styles.submitButtonText}>Cuir leis</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </View>
+        )}
+
         {/* Sentences */}
         <View style={styles.sentencesContainer}>
           {island.sentences.map((sentence, index) => renderSentence(sentence, index))}
@@ -213,6 +422,118 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  expandButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: '#1a5f2a',
+  },
+  expandButtonText: {
+    color: '#1a5f2a',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  expandInputContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  toggleInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginBottom: 16,
+    padding: 8,
+  },
+  toggleInputText: {
+    marginLeft: 6,
+    color: '#1a5f2a',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  voiceInputSection: {
+    alignItems: 'center',
+  },
+  voiceHintText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 16,
+  },
+  recordButton: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#1a5f2a',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  recordButtonActive: {
+    backgroundColor: '#c62828',
+  },
+  textInputSection: {
+    width: '100%',
+  },
+  expandInput: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    minHeight: 80,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  expandButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  cancelButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+  },
+  cancelButtonText: {
+    color: '#666',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  submitButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#1a5f2a',
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#999',
+  },
+  submitButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
   },
   sentencesContainer: {
     gap: 12,

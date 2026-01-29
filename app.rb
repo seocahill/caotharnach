@@ -196,6 +196,20 @@ rescue => e
   { error: e.message }.to_json
 end
 
+# English ASR endpoint (for expansion refinements)
+post '/api/asr/english' do
+  content_type :json
+  request_payload = JSON.parse(request.body.read)
+  audio_blob = request_payload['audio_blob']
+
+  transcription = transcribe_english(audio_blob)
+  { transcription: transcription }.to_json
+rescue => e
+  puts "Error in English ASR: #{e.message}"
+  status 500
+  { error: e.message }.to_json
+end
+
 # Irish ASR endpoint (for future practice mode)
 post '/api/asr/irish' do
   content_type :json
@@ -208,6 +222,22 @@ post '/api/asr/irish' do
   { transcription: transcription }.to_json
 rescue => e
   puts "Error in Irish ASR: #{e.message}"
+  status 500
+  { error: e.message }.to_json
+end
+
+# Expand an existing island with more sentences
+post '/api/islands/:id/expand' do
+  content_type :json
+  request_payload = JSON.parse(request.body.read)
+  island_data = request_payload['island']
+  refinement = request_payload['refinement']
+
+  new_sentences = expand_island(island_data, refinement)
+  new_sentences.to_json
+rescue => e
+  puts "Error expanding island: #{e.message}"
+  puts e.backtrace.first(5)
   status 500
   { error: e.message }.to_json
 end
@@ -326,4 +356,63 @@ def synthesize_speech_for_api(text, voice)
   request['Content-Type'] = 'application/json'
   response = http.request(request)
   JSON.parse(response.body)
+end
+
+def expand_island(island_data, refinement)
+  client = OpenAI::Client.new(access_token: ENV['OPENAI_KEY'], organization_id: ENV['OPENAI_ORG'])
+
+  # Build context of existing sentences
+  existing_sentences_text = island_data['sentences'].map do |s|
+    "- #{s['irish']} (#{s['english']})"
+  end.join("\n")
+
+  system_prompt = <<~PROMPT
+    You are an expert Irish language teacher helping expand an existing "island of fluency" (oileán líofachta).
+    The learner already has these sentences:
+
+    #{existing_sentences_text}
+
+    Based on their refinement request, add 3-5 new sentences that complement what they already have.
+
+    Guidelines:
+    - Use natural, conversational Irish
+    - Build on the existing sentences where appropriate
+    - Keep sentences relatively short and memorable
+    - Include phrases that naturally extend the topic
+    - Provide accurate English translations
+
+    IMPORTANT: Respond ONLY with valid JSON in this exact format, no other text:
+    {
+      "sentences": [
+        {"irish": "Irish sentence 1", "english": "English translation 1"},
+        {"irish": "Irish sentence 2", "english": "English translation 2"}
+      ]
+    }
+  PROMPT
+
+  response = client.chat(parameters: {
+    model: 'gpt-4-1106-preview',
+    messages: [
+      { role: 'system', content: system_prompt },
+      { role: 'user', content: "Add more sentences for: #{refinement}" }
+    ],
+    temperature: 0.7,
+    response_format: { type: 'json_object' }
+  })
+
+  result = JSON.parse(response.dig('choices', 0, 'message', 'content'))
+
+  # Build sentence objects with new IDs
+  island_id = island_data['id']
+  current_count = island_data['sentences'].length
+
+  sentences = result['sentences'].map.with_index do |s, i|
+    {
+      id: "#{island_id}-#{current_count + i}",
+      irish: s['irish'],
+      english: s['english']
+    }
+  end
+
+  { sentences: sentences }
 end
