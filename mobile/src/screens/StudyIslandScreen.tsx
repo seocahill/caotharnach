@@ -7,9 +7,10 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import { Audio } from 'expo-av';
+import { useAudioPlayer, AudioSource } from 'expo-audio';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system/legacy';
 import { RootStackParamList } from '../../App';
 import { Sentence } from '../types/island';
 import { api } from '../services/api';
@@ -21,7 +22,7 @@ export function StudyIslandScreen({ route }: Props) {
   const [expandedSentences, setExpandedSentences] = useState<Set<string>>(new Set());
   const [playingSentence, setPlayingSentence] = useState<string | null>(null);
   const [loadingAudio, setLoadingAudio] = useState<string | null>(null);
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const audioPlayer = useAudioPlayer();
 
   const toggleTranslation = (sentenceId: string) => {
     setExpandedSentences(prev => {
@@ -35,88 +36,67 @@ export function StudyIslandScreen({ route }: Props) {
     });
   };
 
-  const playSentence = async (sentence: Sentence) => {
+  const playSentence = async (sentence: Sentence): Promise<void> => {
     try {
-      // Stop any currently playing audio
-      if (soundRef.current) {
-        await soundRef.current.stopAsync();
-        await soundRef.current.unloadAsync();
-        soundRef.current = null;
-      }
-
+      console.log('[StudyIsland] Starting to play sentence:', sentence.id);
       setLoadingAudio(sentence.id);
       setPlayingSentence(null);
 
       // Get audio from API (or use cached)
       let audioBase64 = sentence.audioBase64;
       if (!audioBase64) {
+        console.log('[StudyIsland] Fetching audio from API...');
         audioBase64 = await api.getSentenceAudio(sentence.irish, island.voice);
       }
 
-      // Configure audio mode for playback
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
+      // Write base64 to temp file (expo-audio doesn't support data URIs)
+      const tempUri = `${FileSystem.cacheDirectory}temp_audio_${sentence.id}.wav`;
+      console.log('[StudyIsland] Writing audio to temp file:', tempUri);
+      await FileSystem.writeAsStringAsync(tempUri, audioBase64, {
+        encoding: FileSystem.EncodingType.Base64,
       });
 
-      // Create and play the sound
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: `data:audio/wav;base64,${audioBase64}` },
-        { shouldPlay: true }
-      );
+      // Load and play the audio file
+      console.log('[StudyIsland] Loading audio file into player');
+      audioPlayer.replace({ uri: tempUri });
+      console.log('[StudyIsland] Calling audioPlayer.play()');
+      audioPlayer.play();
 
-      soundRef.current = sound;
       setLoadingAudio(null);
       setPlayingSentence(sentence.id);
 
-      // Handle playback completion
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && status.didJustFinish) {
-          setPlayingSentence(null);
-          sound.unloadAsync();
-          soundRef.current = null;
-        }
+      // Wait for playback to finish
+      await new Promise<void>((resolve) => {
+        const checkPlayback = setInterval(async () => {
+          if (!audioPlayer.playing) {
+            setPlayingSentence(null);
+            clearInterval(checkPlayback);
+            // Clean up temp file
+            try {
+              await FileSystem.deleteAsync(tempUri, { idempotent: true });
+            } catch (e) {
+              console.error('Failed to delete temp audio file:', e);
+            }
+            resolve();
+          }
+        }, 100);
       });
     } catch (error) {
-      console.error('Failed to play audio:', error);
+      console.error('[StudyIsland] Failed to play audio:', error, error.stack);
       setLoadingAudio(null);
       setPlayingSentence(null);
+      throw error;
     }
   };
 
-  const stopPlayback = async () => {
-    if (soundRef.current) {
-      await soundRef.current.stopAsync();
-      await soundRef.current.unloadAsync();
-      soundRef.current = null;
-      setPlayingSentence(null);
-    }
+  const stopPlayback = () => {
+    audioPlayer.pause();
+    setPlayingSentence(null);
   };
 
   const playAll = async () => {
     for (const sentence of island.sentences) {
-      if (playingSentence !== null) {
-        // Wait for current to finish
-        await new Promise(resolve => {
-          const interval = setInterval(() => {
-            if (playingSentence === null) {
-              clearInterval(interval);
-              resolve(true);
-            }
-          }, 100);
-        });
-      }
       await playSentence(sentence);
-      // Wait for this sentence to finish
-      await new Promise(resolve => {
-        const interval = setInterval(() => {
-          if (playingSentence === null) {
-            clearInterval(interval);
-            resolve(true);
-          }
-        }, 100);
-      });
     }
   };
 

@@ -9,10 +9,10 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
-import { Audio } from 'expo-av';
+import { useAudioRecorder, useAudioRecorderState, AudioModule, RecordingPresets } from 'expo-audio';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { RootStackParamList } from '../../App';
 import { api } from '../services/api';
 import { storage } from '../services/storage';
@@ -30,29 +30,21 @@ export function CreateIslandScreen({ navigation }: Props) {
   const [statusText, setStatusText] = useState('Brúigh an cnaipe chun cur síos a dhéanamh i mBéarla');
   const [manualInput, setManualInput] = useState('');
   const [useManualInput, setUseManualInput] = useState(false);
-  const recording = useRef<Audio.Recording | null>(null);
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(audioRecorder);
 
   const startRecording = async () => {
     try {
       // Request permissions
-      const { granted } = await Audio.requestPermissionsAsync();
-      if (!granted) {
+      const status = await AudioModule.requestRecordingPermissionsAsync();
+      if (!status.granted) {
         Alert.alert('Cead ag teastáil', 'Tá cead micreafón ag teastáil chun fuaim a thaifeadadh.');
         return;
       }
 
-      // Configure audio mode
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-
-      // Start recording
-      const { recording: newRecording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-
-      recording.current = newRecording;
+      // Prepare and start recording
+      await audioRecorder.prepareToRecordAsync();
+      audioRecorder.record();
       setRecordingState('recording');
       setStatusText('Ag éisteacht... Déan cur síos i mBéarla ar an rud a bhfuil tú ag iarraidh labhairt faoi.');
     } catch (error) {
@@ -62,15 +54,14 @@ export function CreateIslandScreen({ navigation }: Props) {
   };
 
   const stopRecording = async () => {
-    if (!recording.current) return;
+    if (!recorderState.isRecording) return;
 
     setRecordingState('processing');
     setStatusText('Ag próiseáil... Fan le do thoil.');
 
     try {
-      await recording.current.stopAndUnloadAsync();
-      const uri = recording.current.getURI();
-      recording.current = null;
+      await audioRecorder.stop();
+      const uri = audioRecorder.uri;
 
       if (!uri) {
         throw new Error('No recording URI');

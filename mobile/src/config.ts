@@ -7,8 +7,8 @@
 
 export const CONFIG = {
   // For local development, use your machine's IP (not localhost!)
-  // Example: 'http://192.168.1.100:8080'
-  API_BASE_DEV: 'http://192.168.1.100:8080',
+  // Example: 'http://192.168.1.3:3000'
+  API_BASE_DEV: 'http://192.168.1.3:3000',
 
   // Production URL
   API_BASE_PROD: 'https://an-caotharnach.fly.dev',
