@@ -62,6 +62,11 @@ error do
   end
 end
 
+# Landing page
+get '/' do
+  erb :index
+end
+
 # Reset conversation session (used by mobile app)
 get '/reset' do
   session.clear
