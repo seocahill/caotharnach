@@ -242,6 +242,21 @@ rescue => e
   { error: e.message }.to_json
 end
 
+# Generate vocabulary for an island
+post '/api/islands/:id/vocabulary' do
+  content_type :json
+  request_payload = JSON.parse(request.body.read)
+  island_data = request_payload['island']
+
+  vocabulary = generate_vocabulary(island_data)
+  vocabulary.to_json
+rescue => e
+  puts "Error generating vocabulary: #{e.message}"
+  puts e.backtrace.first(5)
+  status 500
+  { error: e.message }.to_json
+end
+
 # ============================================
 # HELPER FUNCTIONS FOR ISLANDS
 # ============================================
@@ -280,7 +295,8 @@ def generate_island(description, voice)
     Based on the user's description, create a short set of 5-8 useful Irish sentences they can memorize and use in conversation.
 
     Guidelines:
-    - Use natural, conversational Irish
+    - Use natural, conversational Irish from Connacht/Ulster dialects (Galway, Mayo, Donegal)
+    - Avoid Munster/Standard Irish forms where Connacht/Ulster alternatives exist
     - Include a mix of statements, questions, and responses
     - Keep sentences relatively short and memorable
     - Include common phrases that would naturally come up in this topic
@@ -375,7 +391,8 @@ def expand_island(island_data, refinement)
     Based on their refinement request, add 3-5 new sentences that complement what they already have.
 
     Guidelines:
-    - Use natural, conversational Irish
+    - Use natural, conversational Irish from Connacht/Ulster dialects (Galway, Mayo, Donegal)
+    - Avoid Munster/Standard Irish forms where Connacht/Ulster alternatives exist
     - Build on the existing sentences where appropriate
     - Keep sentences relatively short and memorable
     - Include phrases that naturally extend the topic
@@ -415,4 +432,66 @@ def expand_island(island_data, refinement)
   end
 
   { sentences: sentences }
+end
+
+def generate_vocabulary(island_data)
+  client = OpenAI::Client.new(access_token: ENV['OPENAI_KEY'], organization_id: ENV['OPENAI_ORG'])
+
+  # Build sentences text
+  sentences_text = island_data['sentences'].map do |s|
+    "- #{s['irish']} (#{s['english']})"
+  end.join("\n")
+
+  system_prompt = <<~PROMPT
+    You are an expert Irish language teacher creating a vocabulary list from an "island of fluency" (oileán líofachta).
+
+    From these Irish sentences, extract 8-10 TOPIC-SPECIFIC vocabulary words:
+
+    #{sentences_text}
+
+    CRITICAL: This vocabulary list is for learners who already know basic Irish. They need topic-specific vocabulary, NOT common everyday words.
+
+    EXCLUDE these types of common words:
+    - Basic verbs: bí, déan, abair, rá, téigh, tar, faigh, tabhair, feic, clois
+    - Basic adjectives: maith, dona, mór, beag, fada, gearr
+    - Common prepositions/particles: ag, le, ar, do, de, i, ó, as, faoi, etc.
+    - Basic pronouns: mé, tú, sé, sí, etc.
+
+    INCLUDE only:
+    - Topic-specific nouns (e.g., toghchán=election, peileadóir=footballer, aimsir=weather)
+    - Topic-specific verbs (e.g., vótáil=vote, scóráil=score, báisteach=rain)
+    - Specialized adjectives/descriptors related to the topic
+    - Technical or domain-specific terms
+
+    Guidelines:
+    - Include the word in its base/dictionary form
+    - If the word appears in a mutated or inflected form, note the base form
+    - Provide a concise English definition (1-3 words)
+    - Include an example showing how it's used in the sentences above
+    - Focus on words that are unique to this topic/domain
+
+    IMPORTANT: Respond ONLY with valid JSON in this exact format, no other text:
+    {
+      "vocabulary": [
+        {
+          "irish": "focal",
+          "english": "word",
+          "example": "Tá focal agam duit"
+        }
+      ]
+    }
+  PROMPT
+
+  response = client.chat(parameters: {
+    model: 'gpt-4-1106-preview',
+    messages: [
+      { role: 'system', content: system_prompt },
+      { role: 'user', content: "Extract the key vocabulary from these sentences." }
+    ],
+    temperature: 0.5,
+    response_format: { type: 'json_object' }
+  })
+
+  result = JSON.parse(response.dig('choices', 0, 'message', 'content'))
+  result
 end

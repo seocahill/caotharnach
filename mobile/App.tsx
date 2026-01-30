@@ -3,16 +3,20 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { IslandListScreen } from './src/screens/IslandListScreen';
 import { CreateIslandScreen } from './src/screens/CreateIslandScreen';
 import { StudyIslandScreen } from './src/screens/StudyIslandScreen';
+import { AboutScreen } from './src/screens/AboutScreen';
 import { Island } from './src/types/island';
 
 export type RootStackParamList = {
   IslandList: undefined;
   CreateIsland: undefined;
   StudyIsland: { island: Island };
+  About: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -36,7 +40,14 @@ export default function App() {
           <Stack.Screen
             name="IslandList"
             component={IslandListScreen}
-            options={{ title: 'Oileáin' }}
+            options={({ navigation }) => ({
+              title: 'Oileáin',
+              headerRight: () => (
+                <TouchableOpacity onPress={() => navigation.navigate('About')}>
+                  <Ionicons name="information-circle-outline" size={28} color="#fff" />
+                </TouchableOpacity>
+              ),
+            })}
           />
           <Stack.Screen
             name="CreateIsland"
@@ -49,6 +60,11 @@ export default function App() {
             options={({ route }) => ({
               title: route.params.island.title
             })}
+          />
+          <Stack.Screen
+            name="About"
+            component={AboutScreen}
+            options={{ title: 'Faisnéis' }}
           />
         </Stack.Navigator>
       </NavigationContainer>

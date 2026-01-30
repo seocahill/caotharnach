@@ -1,4 +1,4 @@
-import { Island, Sentence } from '../types/island';
+import { Island, Sentence, VocabWord } from '../types/island';
 import { CONFIG } from '../config';
 
 // Use CONFIG.API_BASE - edit src/config.ts to change URLs
@@ -107,6 +107,27 @@ export const api = {
 
     const data = await response.json();
     return data.sentences;
+  },
+
+  // Generate vocabulary for an island
+  async generateVocabulary(island: Island): Promise<VocabWord[]> {
+    const response = await fetch(`${API_BASE}/api/islands/${island.id}/vocabulary`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        island: island,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to generate vocabulary: ${error}`);
+    }
+
+    const data = await response.json();
+    return data.vocabulary;
   },
 };
 

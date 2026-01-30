@@ -14,7 +14,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
 import { RootStackParamList } from '../../App';
-import { Sentence, Island } from '../types/island';
+import { Sentence, Island, VocabWord } from '../types/island';
 import { api } from '../services/api';
 import { storage } from '../services/storage';
 
@@ -31,6 +31,11 @@ export function StudyIslandScreen({ route, navigation }: Props) {
   const [isExpanding, setIsExpanding] = useState(false);
   const [useVoiceInput, setUseVoiceInput] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
+  const [viewMode, setViewMode] = useState<'sentences' | 'vocabulary'>('sentences');
+  const [vocabulary, setVocabulary] = useState<VocabWord[]>(island.vocabulary || []);
+  const [loadingVocabulary, setLoadingVocabulary] = useState(false);
+  const [flippedCards, setFlippedCards] = useState<Set<number>>(new Set());
+  const [showIrishFirst, setShowIrishFirst] = useState(true); // Direction toggle for flashcards
   const audioPlayer = useAudioPlayer();
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(audioRecorder);
@@ -199,6 +204,49 @@ export function StudyIslandScreen({ route, navigation }: Props) {
     }
   };
 
+  const fetchVocabulary = async (force: boolean = false) => {
+    if (vocabulary.length > 0 && !force) {
+      // Already have vocabulary and not forcing refresh
+      return;
+    }
+
+    setLoadingVocabulary(true);
+    try {
+      const vocabWords = await api.generateVocabulary(island);
+      setVocabulary(vocabWords);
+
+      // Update island with vocabulary and save
+      const updatedIsland: Island = {
+        ...island,
+        vocabulary: vocabWords,
+        updatedAt: new Date().toISOString(),
+      };
+      await storage.saveIsland(updatedIsland);
+      setIsland(updatedIsland);
+    } catch (error) {
+      console.error('Failed to fetch vocabulary:', error);
+      Alert.alert('Earráid', 'Níorbh fhéidir an stór focal a ghiniúint');
+    } finally {
+      setLoadingVocabulary(false);
+    }
+  };
+
+  const refreshVocabulary = async () => {
+    await fetchVocabulary(true);
+  };
+
+  const toggleCard = (index: number) => {
+    setFlippedCards(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      return newSet;
+    });
+  };
+
   const renderSentence = (sentence: Sentence, index: number) => {
     const isExpanded = expandedSentences.has(sentence.id);
     const isPlaying = playingSentence === sentence.id;
@@ -257,7 +305,36 @@ export function StudyIslandScreen({ route, navigation }: Props) {
           <Text style={styles.descriptionText}>{island.description}</Text>
         </View>
 
-        {/* Play all button */}
+        {/* View mode tabs */}
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[styles.tab, viewMode === 'sentences' && styles.tabActive]}
+            onPress={() => setViewMode('sentences')}
+          >
+            <Ionicons name="list" size={20} color={viewMode === 'sentences' ? '#fff' : '#1a5f2a'} />
+            <Text style={[styles.tabText, viewMode === 'sentences' && styles.tabTextActive]}>
+              Abairtí
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, viewMode === 'vocabulary' && styles.tabActive]}
+            onPress={() => {
+              setViewMode('vocabulary');
+              if (vocabulary.length === 0) {
+                fetchVocabulary();
+              }
+            }}
+          >
+            <Ionicons name="book" size={20} color={viewMode === 'vocabulary' ? '#fff' : '#1a5f2a'} />
+            <Text style={[styles.tabText, viewMode === 'vocabulary' && styles.tabTextActive]}>
+              Stór Focal
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {viewMode === 'sentences' ? (
+          <>
+            {/* Play all button */}
         <TouchableOpacity style={styles.playAllButton} onPress={playAll}>
           <Ionicons name="play-circle" size={24} color="#fff" />
           <Text style={styles.playAllText}>Seinn gach ceann</Text>
@@ -373,10 +450,85 @@ export function StudyIslandScreen({ route, navigation }: Props) {
           </View>
         )}
 
-        {/* Sentences */}
-        <View style={styles.sentencesContainer}>
-          {island.sentences.map((sentence, index) => renderSentence(sentence, index))}
-        </View>
+            {/* Sentences */}
+            <View style={styles.sentencesContainer}>
+              {island.sentences.map((sentence, index) => renderSentence(sentence, index))}
+            </View>
+          </>
+        ) : (
+          /* Vocabulary flashcards */
+          <View style={styles.vocabularyContainer}>
+            {/* Controls row */}
+            <View style={styles.vocabularyControls}>
+              {/* Direction toggle */}
+              <TouchableOpacity
+                style={styles.directionToggle}
+                onPress={() => setShowIrishFirst(!showIrishFirst)}
+              >
+                <Ionicons name="swap-horizontal" size={20} color="#1a5f2a" />
+                <Text style={styles.directionToggleText}>
+                  {showIrishFirst ? 'Gaeilge → English' : 'English → Gaeilge'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Refresh button */}
+              {vocabulary.length > 0 && (
+                <TouchableOpacity
+                  style={styles.refreshButton}
+                  onPress={refreshVocabulary}
+                  disabled={loadingVocabulary}
+                >
+                  {loadingVocabulary ? (
+                    <ActivityIndicator size="small" color="#1a5f2a" />
+                  ) : (
+                    <Ionicons name="refresh" size={20} color="#1a5f2a" />
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {loadingVocabulary ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#1a5f2a" />
+                <Text style={styles.loadingText}>Ag giniúint stór focal...</Text>
+              </View>
+            ) : vocabulary.length === 0 ? (
+              <Text style={styles.emptyText}>Níl aon stór focal anseo fós</Text>
+            ) : (
+              vocabulary.map((word, index) => {
+                const isFlipped = flippedCards.has(index);
+                const frontText = showIrishFirst ? word.irish : word.english;
+                const backText = showIrishFirst ? word.english : word.irish;
+                const hintText = showIrishFirst
+                  ? (isFlipped ? 'Tap to show Irish' : 'Tap to show English')
+                  : (isFlipped ? 'Tap to show English' : 'Tap to show Irish');
+
+                return (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.flashcard}
+                    onPress={() => toggleCard(index)}
+                  >
+                    <View style={styles.flashcardContent}>
+                      <Text style={styles.flashcardMainText}>
+                        {isFlipped ? backText : frontText}
+                      </Text>
+                      {isFlipped && (
+                        <Text style={styles.flashcardExample}>{word.example}</Text>
+                      )}
+                      <View style={styles.flashcardHint}>
+                        <Ionicons name="sync" size={16} color="#999" />
+                        <Text style={styles.flashcardHintText}>
+                          {hintText}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -406,6 +558,127 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     fontStyle: 'italic',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  tabActive: {
+    backgroundColor: '#1a5f2a',
+  },
+  tabText: {
+    marginLeft: 6,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1a5f2a',
+  },
+  tabTextActive: {
+    color: '#fff',
+  },
+  vocabularyContainer: {
+    gap: 12,
+  },
+  vocabularyControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  directionToggle: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#1a5f2a',
+  },
+  directionToggleText: {
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1a5f2a',
+  },
+  refreshButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#1a5f2a',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#666',
+  },
+  emptyText: {
+    textAlign: 'center',
+    fontSize: 14,
+    color: '#666',
+    paddingVertical: 40,
+  },
+  flashcard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 24,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    minHeight: 150,
+    justifyContent: 'center',
+  },
+  flashcardContent: {
+    alignItems: 'center',
+  },
+  flashcardMainText: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#1a5f2a',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  flashcardExample: {
+    fontSize: 14,
+    color: '#666',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  flashcardHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  flashcardHintText: {
+    fontSize: 12,
+    color: '#999',
   },
   playAllButton: {
     flexDirection: 'row',
