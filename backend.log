@@ -1,0 +1,24 @@
+Bundler is using a binstub that was created for a different gem (rack).
+You should run `bundle binstub rackup` to work around a system/bundle conflict.
+2026-01-30 01:54:52 +0100 Thin web server (v1.8.2 codename Ruby Razor)
+2026-01-30 01:54:52 +0100 Maximum connections set to 1024
+2026-01-30 01:54:52 +0100 Listening on 0.0.0.0:3000, CTRL+C to stop
+[vocabulary] Received request for island: d576ae6e6fc2
+[vocabulary] Island has 12 sentences
+[generate_vocabulary] Sentences text length: 1000 chars
+[generate_vocabulary] Calling OpenAI...
+[generate_vocabulary] OpenAI response length: 1040 chars
+[generate_vocabulary] Parsed vocabulary with 8 words
+[vocabulary] Generated 8 vocab words
+192.168.1.4 - - [30/Jan/2026:01:55:06 +0100] "POST /api/islands/d576ae6e6fc2/vocabulary HTTP/1.1" 200 775 3.4408
+[forward_audio] Starting audio processing...
+[forward_audio] Transcribing Irish audio...
+[forward_audio] ASR response: {"audioFilePath" => "/tmp/aec3c797-813f-40fe-bf7d-3dcbf6154dc9.wav", "transcriptions" => [{"utterance" => "t\u00E1 t\u00FA ag obair aisteoir "}], "duration" => 0.9908047067001462}
+[forward_audio] User said: tá tú ag obair aisteoir 
+[forward_audio] Getting GPT response...
+[forward_audio] Assistant replied: Níl mé ag obair mar aisteoir, ach is post suimiúil é sin! Cad a dhéanann tusa?
+[forward_audio] Synthesizing speech...
+[forward_audio] Success! Returning response
+192.168.1.4 - - [30/Jan/2026:01:55:19 +0100] "POST /forward_audio HTTP/1.1" 200 244339 2.6979
+clearing session
+192.168.1.4 - - [30/Jan/2026:01:55:25 +0100] "GET /reset HTTP/1.1" 200 16 0.0026
