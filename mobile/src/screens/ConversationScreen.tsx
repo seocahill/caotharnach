@@ -85,6 +85,7 @@ export function ConversationScreen({ navigation }: Props) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-API-Key': CONFIG.API_KEY,
         },
         body: JSON.stringify({
           audio_blob: audioBase64,
@@ -172,6 +173,9 @@ export function ConversationScreen({ navigation }: Props) {
       // Clear session on backend
       await fetch(`${CONFIG.API_BASE}/reset`, {
         method: 'GET',
+        headers: {
+          'X-API-Key': CONFIG.API_KEY,
+        },
       });
       setMessages([]);
     } catch (error) {

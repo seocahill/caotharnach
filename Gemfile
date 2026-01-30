@@ -2,6 +2,7 @@
 source 'https://rubygems.org'
 
 gem 'sinatra'
+gem 'dotenv'  # Load .env file
 
 gem "ruby-openai", "~> 7.0"
 

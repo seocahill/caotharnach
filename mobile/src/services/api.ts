@@ -4,14 +4,18 @@ import { CONFIG } from '../config';
 // Use CONFIG.API_BASE - edit src/config.ts to change URLs
 const API_BASE = CONFIG.API_BASE;
 
+// Helper to get headers with API key
+const getHeaders = () => ({
+  'Content-Type': 'application/json',
+  'X-API-Key': CONFIG.API_KEY,
+});
+
 export const api = {
   // Create a new island from English audio description
   async createIsland(audioBase64: string, voice: string = 'ga_UL_anb_piper'): Promise<Island> {
     const response = await fetch(`${API_BASE}/api/islands`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getHeaders(),
       body: JSON.stringify({
         audio_blob: audioBase64,
         voice: voice,
@@ -30,9 +34,7 @@ export const api = {
   async getSentenceAudio(text: string, voice: string = 'ga_UL_anb_piper'): Promise<string> {
     const response = await fetch(`${API_BASE}/api/tts`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getHeaders(),
       body: JSON.stringify({
         text: text,
         voice: voice,
@@ -51,9 +53,7 @@ export const api = {
   async transcribeIrish(audioBase64: string): Promise<string> {
     const response = await fetch(`${API_BASE}/api/asr/irish`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getHeaders(),
       body: JSON.stringify({
         audio_blob: audioBase64,
       }),
@@ -71,9 +71,7 @@ export const api = {
   async transcribeEnglish(audioBase64: string): Promise<string> {
     const response = await fetch(`${API_BASE}/api/asr/english`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getHeaders(),
       body: JSON.stringify({
         audio_blob: audioBase64,
       }),
@@ -91,9 +89,7 @@ export const api = {
   async expandIsland(island: Island, refinement: string): Promise<Sentence[]> {
     const response = await fetch(`${API_BASE}/api/islands/${island.id}/expand`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getHeaders(),
       body: JSON.stringify({
         island: island,
         refinement: refinement,
@@ -113,9 +109,7 @@ export const api = {
   async generateVocabulary(island: Island): Promise<VocabWord[]> {
     const response = await fetch(`${API_BASE}/api/islands/${island.id}/vocabulary`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getHeaders(),
       body: JSON.stringify({
         island: island,
       }),

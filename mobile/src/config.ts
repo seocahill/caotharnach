@@ -13,6 +13,9 @@ export const CONFIG = {
   // Production URL
   API_BASE_PROD: 'https://an-caotharnach.fly.dev',
 
+  // API Key for authentication
+  API_KEY: '84ebf2563720f33ffd35701c3c54b8557429e0f54dda86320e763b29b61e05c7',
+
   // Get the appropriate URL based on environment
   get API_BASE() {
     return __DEV__ ? this.API_BASE_DEV : this.API_BASE_PROD;

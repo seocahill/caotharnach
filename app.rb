@@ -6,6 +6,7 @@ require 'uri'
 require 'pry'
 require 'securerandom'
 require 'openai'
+require 'dotenv/load'
 
 enable :sessions
 
@@ -16,11 +17,49 @@ set :port, ENV['PORT'] || 8080
 before do
   headers['Access-Control-Allow-Origin'] = '*'
   headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
-  headers['Access-Control-Allow-Headers'] = 'Content-Type'
+  headers['Access-Control-Allow-Headers'] = 'Content-Type, X-API-Key'
 end
 
 options '*' do
   200
+end
+
+# API key authentication for mobile endpoints
+before do
+  # Skip authentication for OPTIONS requests (CORS preflight)
+  next if request.request_method == 'OPTIONS'
+
+  # Check API key for all API endpoints
+  if request.path.start_with?('/api/') || request.path == '/forward_audio' || request.path == '/reset'
+    api_key = request.env['HTTP_X_API_KEY']
+    expected_key = ENV['APP_API_KEY']
+
+    if expected_key && api_key != expected_key
+      halt 401, {'Content-Type' => 'application/json'}, {error: 'Invalid API key'}.to_json
+    end
+  end
+end
+
+# Global error handler for API endpoints - return JSON instead of HTML
+error do
+  err = env['sinatra.error']
+
+  if request.path.start_with?('/api/') || request.path == '/forward_audio' || request.path == '/reset'
+    content_type :json
+    status 500
+
+    puts "[global_error] #{err.class}: #{err.message}"
+    puts err.backtrace.first(10)
+
+    {
+      error: err.message,
+      error_class: err.class.to_s
+    }.to_json
+  else
+    # For non-API routes, use default HTML error handling
+    status 500
+    "Internal Server Error"
+  end
 end
 
 # Reset conversation session (used by mobile app)
@@ -257,16 +296,29 @@ end
 # Generate vocabulary for an island
 post '/api/islands/:id/vocabulary' do
   content_type :json
-  request_payload = JSON.parse(request.body.read)
-  island_data = request_payload['island']
 
-  vocabulary = generate_vocabulary(island_data)
-  vocabulary.to_json
-rescue => e
-  puts "Error generating vocabulary: #{e.message}"
-  puts e.backtrace.first(5)
-  status 500
-  { error: e.message }.to_json
+  begin
+    request_payload = JSON.parse(request.body.read)
+    island_data = request_payload['island']
+
+    puts "[vocabulary] Received request for island: #{island_data['id']}"
+    puts "[vocabulary] Island has #{island_data['sentences']&.length || 0} sentences"
+
+    vocabulary = generate_vocabulary(island_data)
+    puts "[vocabulary] Generated #{vocabulary['vocabulary']&.length || 0} vocab words"
+    vocabulary.to_json
+  rescue JSON::ParserError => e
+    puts "[vocabulary] JSON Parse Error: #{e.message}"
+    puts e.backtrace.first(10)
+    status 400
+    { error: "Invalid JSON: #{e.message}" }.to_json
+  rescue => e
+    puts "[vocabulary] Error: #{e.message}"
+    puts "[vocabulary] Error class: #{e.class}"
+    puts e.backtrace.first(10)
+    status 500
+    { error: e.message, error_class: e.class.to_s }.to_json
+  end
 end
 
 # ============================================
@@ -447,12 +499,17 @@ def expand_island(island_data, refinement)
 end
 
 def generate_vocabulary(island_data)
+  raise "Island data is nil" if island_data.nil?
+  raise "Island has no sentences" if island_data['sentences'].nil? || island_data['sentences'].empty?
+
   client = OpenAI::Client.new(access_token: ENV['OPENAI_KEY'], organization_id: ENV['OPENAI_ORG'])
 
   # Build sentences text
   sentences_text = island_data['sentences'].map do |s|
     "- #{s['irish']} (#{s['english']})"
   end.join("\n")
+
+  puts "[generate_vocabulary] Sentences text length: #{sentences_text.length} chars"
 
   system_prompt = <<~PROMPT
     You are an expert Irish language teacher creating a vocabulary list from an "island of fluency" (oileán líofachta).
@@ -494,6 +551,7 @@ def generate_vocabulary(island_data)
     }
   PROMPT
 
+  puts "[generate_vocabulary] Calling OpenAI..."
   response = client.chat(parameters: {
     model: 'gpt-4o',
     messages: [
@@ -504,6 +562,14 @@ def generate_vocabulary(island_data)
     response_format: { type: 'json_object' }
   })
 
-  result = JSON.parse(response.dig('choices', 0, 'message', 'content'))
+  content = response.dig('choices', 0, 'message', 'content')
+  puts "[generate_vocabulary] OpenAI response length: #{content&.length || 0} chars"
+
+  result = JSON.parse(content)
+  puts "[generate_vocabulary] Parsed vocabulary with #{result['vocabulary']&.length || 0} words"
   result
+rescue StandardError => e
+  puts "[generate_vocabulary] Exception: #{e.message}"
+  puts "[generate_vocabulary] Exception class: #{e.class}"
+  raise e
 end
