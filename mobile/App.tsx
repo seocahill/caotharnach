@@ -3,13 +3,14 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { TouchableOpacity } from 'react-native';
+import { TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { IslandListScreen } from './src/screens/IslandListScreen';
 import { CreateIslandScreen } from './src/screens/CreateIslandScreen';
 import { StudyIslandScreen } from './src/screens/StudyIslandScreen';
 import { AboutScreen } from './src/screens/AboutScreen';
+import { ConversationScreen } from './src/screens/ConversationScreen';
 import { Island } from './src/types/island';
 
 export type RootStackParamList = {
@@ -17,6 +18,7 @@ export type RootStackParamList = {
   CreateIsland: undefined;
   StudyIsland: { island: Island };
   About: undefined;
+  Conversation: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -43,9 +45,14 @@ export default function App() {
             options={({ navigation }) => ({
               title: 'Oileáin',
               headerRight: () => (
-                <TouchableOpacity onPress={() => navigation.navigate('About')}>
-                  <Ionicons name="information-circle-outline" size={28} color="#fff" />
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row' }}>
+                  <TouchableOpacity onPress={() => navigation.navigate('Conversation')}>
+                    <Ionicons name="chatbubbles-outline" size={28} color="#fff" />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => navigation.navigate('About')} style={{ marginLeft: 16 }}>
+                    <Ionicons name="information-circle-outline" size={28} color="#fff" />
+                  </TouchableOpacity>
+                </View>
               ),
             })}
           />
@@ -65,6 +72,11 @@ export default function App() {
             name="About"
             component={AboutScreen}
             options={{ title: 'Faisnéis' }}
+          />
+          <Stack.Screen
+            name="Conversation"
+            component={ConversationScreen}
+            options={{ title: 'Comhrá' }}
           />
         </Stack.Navigator>
       </NavigationContainer>

@@ -1,0 +1,42 @@
+Bundler is using a binstub that was created for a different gem (rack).
+You should run `bundle binstub rackup` to work around a system/bundle conflict.
+2026-01-30 01:27:22 +0100 Thin web server (v1.8.2 codename Ruby Razor)
+2026-01-30 01:27:22 +0100 Maximum connections set to 1024
+2026-01-30 01:27:22 +0100 Listening on 0.0.0.0:3000, CTRL+C to stop
+[forward_audio] Starting audio processing...
+[forward_audio] Transcribing Irish audio...
+[forward_audio] ASR response: {"audioFilePath" => "/tmp/fa5ba7fb-ce1e-4dc9-98ad-1ad9eaf81251.wav", "transcriptions" => [{"utterance" => "an bhfuil t\u00FA ag obair anois "}], "duration" => 0.8673911551013589}
+[forward_audio] User said: an bhfuil tú ag obair anois 
+[forward_audio] Getting GPT response...
+[forward_audio] Assistant replied: Tá mé ag obair, ach ní i gcónaí. Cad faoi tusa? An bhfuil tú ag obair?
+[forward_audio] Synthesizing speech...
+[forward_audio] Success! Returning response
+192.168.1.4 - - [30/Jan/2026:01:27:45 +0100] "POST /forward_audio HTTP/1.1" 200 212236 3.2806
+[forward_audio] Starting audio processing...
+[forward_audio] Transcribing Irish audio...
+[forward_audio] ASR response: {"audioFilePath" => "/tmp/392b6abc-13f8-4f1b-a01b-d81f76d97543.wav", "transcriptions" => [{"utterance" => "t\u00E1 m\u00E9 r\u00E9idh ag dul i mo lu\u00ED anois "}], "duration" => 1.0355595108121634}
+[forward_audio] User said: tá mé réidh ag dul i mo luí anois 
+[forward_audio] Getting GPT response...
+[forward_audio] Assistant replied: Tá sé sin go maith. Tá sé tábhachtach codladh maith a fháil. Codladh sámh!
+[forward_audio] Synthesizing speech...
+[forward_audio] Success! Returning response
+192.168.1.4 - - [30/Jan/2026:01:27:57 +0100] "POST /forward_audio HTTP/1.1" 200 242849 3.3565
+[forward_audio] Starting audio processing...
+[forward_audio] Transcribing Irish audio...
+[forward_audio] ASR response: {"audioFilePath" => "/tmp/f184db35-45ab-461e-b3e6-e6d3ffaf55f1.wav", "transcriptions" => [{"utterance" => "go raibh m\u00EDle maith agat sl\u00E1n go f\u00F3ill "}], "duration" => 0.8078468963503838}
+[forward_audio] User said: go raibh míle maith agat slán go fóill 
+[forward_audio] Getting GPT response...
+[forward_audio] Assistant replied: Slán go fóill! Codladh sámh agus feicfidh mé thú ar ball.
+[forward_audio] Synthesizing speech...
+[forward_audio] Success! Returning response
+192.168.1.4 - - [30/Jan/2026:01:28:09 +0100] "POST /forward_audio HTTP/1.1" 200 212578 2.2360
+clearing session
+192.168.1.4 - - [30/Jan/2026:01:28:14 +0100] "GET /reset HTTP/1.1" 200 16 0.0044
+192.168.1.4 - - [30/Jan/2026:01:28:46 +0100] "POST /api/asr/english HTTP/1.1" 200 95 1.2543
+192.168.1.4 - - [30/Jan/2026:01:28:54 +0100] "POST /api/islands/d576ae6e6fc2/expand HTTP/1.1" 200 766 5.5840
+192.168.1.4 - - [30/Jan/2026:01:29:03 +0100] "POST /api/tts HTTP/1.1" 200 174037 0.3561
+192.168.1.4 - - [30/Jan/2026:01:29:08 +0100] "POST /api/tts HTTP/1.1" 200 186482 0.3769
+192.168.1.4 - - [30/Jan/2026:01:29:12 +0100] "POST /api/tts HTTP/1.1" 200 181710 0.3867
+192.168.1.4 - - [30/Jan/2026:01:29:15 +0100] "POST /api/tts HTTP/1.1" 200 187790 0.3609
+192.168.1.4 - - [30/Jan/2026:01:29:20 +0100] "POST /api/tts HTTP/1.1" 200 130364 0.3407
+192.168.1.4 - - [30/Jan/2026:01:29:29 +0100] "POST /api/islands/d576ae6e6fc2/vocabulary HTTP/1.1" 200 789 3.4433

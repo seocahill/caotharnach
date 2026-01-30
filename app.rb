@@ -23,57 +23,82 @@ options '*' do
   200
 end
 
-get '/' do
-  session[:context] ||= [
-    { role: 'system', content: "You are an Irish speaker called 'An Chaothernach'. You are chatting with another Irish speaker about everyday things, e.g. your job, your family, holidays, the news, the weather, hobbies, etc. Try not to give long answers. If you don't understand, say it." }
-  ]
-  session[:guth] ||= 'ga_UL_anb_piper'
-  @context = session[:context].detect { |line| line[:role] == 'system' }.dig(:content)
-  @guth = session[:guth]
-  puts @context, @guth
-  erb :index
-end
-
+# Reset conversation session (used by mobile app)
 get '/reset' do
   session.clear
-  puts "clearning session"
-  redirect '/'
-end
-
-post '/set_context' do
-  session[:context] = [
-    { role: 'system', content: params["context"] }
-  ]
-  session[:guth] = params["guth"]
-  puts params
-  redirect '/'
-end
-
-post '/forward_audio' do
-  request_payload = JSON.parse(request.body.read)
-  audio_blob = request_payload['audio_blob']
-  response = forward_audio(audio_blob)
-  puts response
-  prompt = JSON.parse(response.to_json).dig("transcriptions", 0, "utterance")
-  puts prompt
-  session[:context] << { role: "user", content: prompt }
-  # puts prompt
-  reply = chat_with_gpt
-  session[:context] << { role: "assistant", content: reply }
-  # puts reply
+  puts "clearing session"
   content_type :json
-  payload = JSON.parse(synthesize_speech(reply))
-  payload["tusa"] = prompt
-  payload["sise"] = reply
-  payload.to_json
-rescue => e
-  puts e
+  { success: true }.to_json
+end
+
+# Conversation mode: Irish ASR → GPT chat → Irish TTS (used by mobile app)
+post '/forward_audio' do
+  content_type :json
+
+  begin
+    puts "[forward_audio] Starting audio processing..."
+    request_payload = JSON.parse(request.body.read)
+    audio_blob = request_payload['audio_blob']
+
+    if audio_blob.nil? || audio_blob.empty?
+      puts "[forward_audio] ERROR: No audio blob provided"
+      status 400
+      return { error: 'No audio data provided' }.to_json
+    end
+
+    # Initialize session if not set
+    session[:context] ||= [
+      { role: 'system', content: "You are an Irish speaker called 'An Chaothernach'. You are chatting with another Irish speaker about everyday things, e.g. your job, your family, holidays, the news, the weather, hobbies, etc. Try not to give long answers. If you don't understand, say it." }
+    ]
+    session[:guth] ||= 'ga_UL_anb_piper'
+
+    # Transcribe Irish audio
+    puts "[forward_audio] Transcribing Irish audio..."
+    response = forward_audio(audio_blob)
+    puts "[forward_audio] ASR response: #{response.inspect}"
+    prompt = JSON.parse(response.to_json).dig("transcriptions", 0, "utterance")
+
+    if prompt.nil? || prompt.empty?
+      puts "[forward_audio] ERROR: No transcription received"
+      status 500
+      return { error: 'Failed to transcribe audio' }.to_json
+    end
+
+    puts "[forward_audio] User said: #{prompt}"
+
+    # Add to context and get GPT response
+    session[:context] << { role: "user", content: prompt }
+    puts "[forward_audio] Getting GPT response..."
+    reply = chat_with_gpt
+    session[:context] << { role: "assistant", content: reply }
+    puts "[forward_audio] Assistant replied: #{reply}"
+
+    # Synthesize speech and return
+    puts "[forward_audio] Synthesizing speech..."
+    payload = JSON.parse(synthesize_speech(reply))
+    payload["tusa"] = prompt
+    payload["sise"] = reply
+    puts "[forward_audio] Success! Returning response"
+    payload.to_json
+  rescue JSON::ParserError => e
+    puts "[forward_audio] JSON Parse Error: #{e.message}"
+    puts e.backtrace.first(5)
+    status 400
+    { error: "Invalid JSON: #{e.message}" }.to_json
+  rescue => e
+    puts "[forward_audio] Error in conversation: #{e.message}"
+    puts e.backtrace.first(5)
+    status 500
+    { error: e.message }.to_json
+  end
 end
 
 def forward_audio(audio_blob)
   uri = URI.parse('https://phoneticsrv3.lcs.tcd.ie/asr_api/recognise')
   http = Net::HTTP.new(uri.host, uri.port)
   http.use_ssl = true
+  # Disable SSL verification for this specific request
+  http.verify_mode = OpenSSL::SSL::VERIFY_NONE
   request = Net::HTTP::Post.new(uri.path)
 
   payload = {
@@ -89,19 +114,16 @@ def forward_audio(audio_blob)
   JSON.parse(response.body)
 end
 
-def truncated_context
-  session[:context].last(10).join('\n')
-end
-
 def chat_with_gpt
   response = OpenAI::Client.new(access_token: ENV['OPENAI_KEY'], organization_id: ENV['OPENAI_ORG']).chat(parameters: {
-    model: 'gpt-4-1106-preview',
+    model: 'gpt-4o',
     messages: session[:context],
     temperature: 0.5
   })
   # puts response
   response.dig('choices', 0, 'message', 'content')
 rescue => e
+  puts "[chat_with_gpt] Error: #{e.message}"
   "Tá aiféala orm ach tá ganntanas airgid ag cur isteach orm. Tá mo OpenAI cúntas folamh, is dóigh liom."
 end
 
@@ -129,16 +151,6 @@ def synthesize_speech(text)
   request['Content-Type'] = 'application/json'
   response = http.request(request)
   response.body
-end
-
-get '/get_context' do
-  content_type :json
-  # Assuming contextArray is an array containing conversation history
-  puts "===================="
-  puts session[:context].last(2)
-    puts "===================="
-
-  session[:context].last(2).to_json
 end
 
 # ============================================
@@ -314,7 +326,7 @@ def generate_island(description, voice)
   PROMPT
 
   response = client.chat(parameters: {
-    model: 'gpt-4-1106-preview',
+    model: 'gpt-4o',
     messages: [
       { role: 'system', content: system_prompt },
       { role: 'user', content: "Create an island for: #{description}" }
@@ -408,7 +420,7 @@ def expand_island(island_data, refinement)
   PROMPT
 
   response = client.chat(parameters: {
-    model: 'gpt-4-1106-preview',
+    model: 'gpt-4o',
     messages: [
       { role: 'system', content: system_prompt },
       { role: 'user', content: "Add more sentences for: #{refinement}" }
@@ -483,7 +495,7 @@ def generate_vocabulary(island_data)
   PROMPT
 
   response = client.chat(parameters: {
-    model: 'gpt-4-1106-preview',
+    model: 'gpt-4o',
     messages: [
       { role: 'system', content: system_prompt },
       { role: 'user', content: "Extract the key vocabulary from these sentences." }
