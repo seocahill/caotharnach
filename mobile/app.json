@@ -14,7 +14,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "ie.oileain.app",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "We need access to your microphone to record your voice for creating Irish language islands."
+        "NSMicrophoneUsageDescription": "We need access to your microphone to record your voice for creating Irish language islands.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -33,7 +34,9 @@
           "microphonePermission": "Allow Oileáin to access your microphone for voice recording."
         }
       ],
-      "expo-audio"
+      "expo-audio",
+      "expo-font",
+      "expo-asset"
     ],
     "extra": {
       "eas": {

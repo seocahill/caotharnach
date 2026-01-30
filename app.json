@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "c7f336bd-898f-4416-a12e-9ba9714602ff"
+      }
+    },
+    "android": {
+      "package": "com.seosamhoc.caotharnach"
+    },
+    "ios": {
+      "bundleIdentifier": "com.seosamhoc.caotharnach",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    }
+  }
+}
