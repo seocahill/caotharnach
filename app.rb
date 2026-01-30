@@ -8,7 +8,9 @@ require 'securerandom'
 require 'openai'
 require 'dotenv/load'
 
+# Session configuration
 enable :sessions
+set :session_secret, ENV['SESSION_SECRET'] || SecureRandom.hex(64)
 
 set :public_folder, File.dirname(__FILE__)
 set :port, ENV['PORT'] || 8080

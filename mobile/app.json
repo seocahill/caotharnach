@@ -20,7 +20,10 @@
     "android": {
       "package": "ie.oileain.app",
       "permissions": [
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
     },
     "plugins": [
@@ -31,6 +34,17 @@
         }
       ],
       "expo-audio"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "3c6851f2-b41b-458e-8e0f-46cf15800930"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/3c6851f2-b41b-458e-8e0f-46cf15800930"
+    }
   }
 }
