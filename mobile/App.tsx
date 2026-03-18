@@ -11,6 +11,7 @@ import { CreateIslandScreen } from './src/screens/CreateIslandScreen';
 import { StudyIslandScreen } from './src/screens/StudyIslandScreen';
 import { AboutScreen } from './src/screens/AboutScreen';
 import { ConversationScreen } from './src/screens/ConversationScreen';
+import { SpeechImproverScreen } from './src/screens/SpeechImproverScreen';
 import { Island } from './src/types/island';
 
 export type RootStackParamList = {
@@ -19,6 +20,7 @@ export type RootStackParamList = {
   StudyIsland: { island: Island };
   About: undefined;
   Conversation: undefined;
+  SpeechImprover: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -46,7 +48,10 @@ export default function App() {
               title: 'Oileáin',
               headerRight: () => (
                 <View style={{ flexDirection: 'row' }}>
-                  <TouchableOpacity onPress={() => navigation.navigate('Conversation')}>
+                  <TouchableOpacity onPress={() => navigation.navigate('SpeechImprover')}>
+                    <Ionicons name="analytics-outline" size={28} color="#fff" />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => navigation.navigate('Conversation')} style={{ marginLeft: 16 }}>
                     <Ionicons name="chatbubbles-outline" size={28} color="#fff" />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => navigation.navigate('About')} style={{ marginLeft: 16 }}>
@@ -77,6 +82,11 @@ export default function App() {
             name="Conversation"
             component={ConversationScreen}
             options={{ title: 'Comhrá' }}
+          />
+          <Stack.Screen
+            name="SpeechImprover"
+            component={SpeechImproverScreen}
+            options={{ title: 'Cleachtadh Cainte' }}
           />
         </Stack.Navigator>
       </NavigationContainer>

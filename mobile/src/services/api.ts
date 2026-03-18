@@ -1,4 +1,4 @@
-import { Island, Sentence, VocabWord } from '../types/island';
+import { Island, Sentence, VocabWord, SpeechFeedback } from '../types/island';
 import { CONFIG } from '../config';
 
 // Use CONFIG.API_BASE - edit src/config.ts to change URLs
@@ -47,6 +47,42 @@ export const api = {
 
     const data = await response.json();
     return data.audioContent; // base64 encoded audio
+  },
+
+  // Transcribe Irish audio via Abair v3-5 (more robust)
+  async transcribeIrishAbair(audioBase64: string): Promise<{ transcription: string; raw: unknown }> {
+    const response = await fetch(`${API_BASE}/api/asr/abair`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ audio_blob: audioBase64 }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Abair transcription failed: ${error}`);
+    }
+
+    return response.json();
+  },
+
+  // Get speech improvement feedback from GPT
+  async improveSpeech(
+    transcription: string,
+    topic: string,
+    dialect: 'ulster' | 'connacht' | 'munster'
+  ): Promise<SpeechFeedback> {
+    const response = await fetch(`${API_BASE}/api/speech/improve`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ transcription, topic, dialect }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Speech improvement failed: ${error}`);
+    }
+
+    return response.json();
   },
 
   // Transcribe Irish audio (for future practice mode)

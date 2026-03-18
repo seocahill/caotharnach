@@ -284,6 +284,63 @@ rescue => e
   { error: e.message }.to_json
 end
 
+# Abair v3-5 Irish ASR endpoint (more robust than TCD API)
+post '/api/asr/abair' do
+  content_type :json
+
+  begin
+    request_payload = JSON.parse(request.body.read)
+    audio_blob = request_payload['audio_blob']
+
+    if audio_blob.nil? || audio_blob.empty?
+      status 400
+      return { error: 'No audio data provided' }.to_json
+    end
+
+    puts "[asr/abair] Forwarding audio to Abair recognition API..."
+    result = transcribe_irish_abair(audio_blob)
+
+    # Abair v3-5 returns various formats - normalise to { transcription: "..." }
+    transcription = result['transcription'] ||
+                    result['text'] ||
+                    result.dig('output', 0, 'transcription') ||
+                    result.to_s
+
+    { transcription: transcription, raw: result }.to_json
+  rescue => e
+    puts "[asr/abair] Error: #{e.message}"
+    puts e.backtrace.first(5)
+    status 500
+    { error: e.message }.to_json
+  end
+end
+
+# Speech improver: analyse Irish speech transcription with GPT feedback
+post '/api/speech/improve' do
+  content_type :json
+
+  begin
+    request_payload = JSON.parse(request.body.read)
+    transcription = request_payload['transcription']
+    topic = request_payload['topic'] || 'general conversation'
+    dialect = request_payload['dialect'] || 'connacht'
+
+    if transcription.nil? || transcription.strip.empty?
+      status 400
+      return { error: 'No transcription provided' }.to_json
+    end
+
+    puts "[speech/improve] Generating feedback for dialect=#{dialect}, topic=#{topic}"
+    feedback = generate_speech_feedback(transcription, topic, dialect)
+    feedback.to_json
+  rescue => e
+    puts "[speech/improve] Error: #{e.message}"
+    puts e.backtrace.first(5)
+    status 500
+    { error: e.message }.to_json
+  end
+end
+
 # Expand an existing island with more sentences
 post '/api/islands/:id/expand' do
   content_type :json
@@ -503,6 +560,118 @@ def expand_island(island_data, refinement)
   end
 
   { sentences: sentences }
+end
+
+# ============================================
+# SPEECH IMPROVER FUNCTIONS
+# ============================================
+
+def transcribe_irish_abair(audio_base64)
+  audio_data = Base64.decode64(audio_base64)
+
+  uri = URI.parse('https://recognition.abair.ie/v3-5/transcribe')
+  http = Net::HTTP.new(uri.host, uri.port)
+  http.use_ssl = true
+  http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+  http.open_timeout = 30
+  http.read_timeout = 60
+
+  boundary = "----RubyFormBoundary#{SecureRandom.hex(16)}"
+
+  # Build multipart body as binary-safe string
+  body = ''.dup.force_encoding('BINARY')
+  body << "--#{boundary}\r\n"
+  body << "Content-Disposition: form-data; name=\"file\"; filename=\"recording.m4a\"\r\n"
+  body << "Content-Type: audio/mp4\r\n"
+  body << "\r\n"
+  body << audio_data.force_encoding('BINARY')
+  body << "\r\n"
+  body << "--#{boundary}\r\n"
+  body << "Content-Disposition: form-data; name=\"captpunct\"\r\n"
+  body << "\r\n"
+  body << "true\r\n"
+  body << "--#{boundary}--\r\n"
+
+  request = Net::HTTP::Post.new(uri.path)
+  request.body = body
+  request['Content-Type'] = "multipart/form-data; boundary=#{boundary}"
+  request['User-Agent'] = 'Mozilla/5.0'
+  request['Accept'] = '*/*'
+  request['Origin'] = 'https://abair.ie'
+  request['Referer'] = 'https://abair.ie/'
+
+  response = http.request(request)
+  puts "[transcribe_irish_abair] Response status: #{response.code}"
+  puts "[transcribe_irish_abair] Response body: #{response.body[0..300]}"
+  JSON.parse(response.body)
+end
+
+def generate_speech_feedback(transcription, topic, dialect)
+  client = OpenAI::Client.new(access_token: ENV['OPENAI_KEY'], organization_id: ENV['OPENAI_ORG'])
+
+  dialect_description = case dialect
+  when 'ulster'
+    'Ulster Irish (Donegal/Tír Chonaill). Common features: "cha" for negation, broad pronunciation, specific vocabulary.'
+  when 'munster'
+    'Munster Irish (Kerry/Cork/Waterford). Common features: synthetic verb forms like "bhíos/bhíomar", specific stress patterns.'
+  else
+    'Connacht Irish (Galway/Mayo/Aran). Common features: "níl" for negation, specific vocabulary and phonology.'
+  end
+
+  system_prompt = <<~PROMPT
+    You are a warm, encouraging Irish language coach helping someone practice speaking Irish.
+    The learner is practicing speaking about: "#{topic}"
+    Their dialect is: #{dialect_description}
+
+    CRITICAL DIALECT RULES:
+    - Dialectal variation is NOT an error. If someone uses Ulster, Connacht, or Munster forms correctly for their dialect, that is CORRECT Irish.
+    - Do NOT correct valid dialectal forms (e.g., "cha raibh" is correct Ulster Irish, not an error).
+    - Only flag genuine grammatical mistakes, not dialect choices.
+    - If unsure whether something is dialectal or an error, err on the side of accepting it.
+    - Vocabulary suggestions should prefer words natural in the learner's dialect.
+
+    COACHING APPROACH:
+    - Be warm, encouraging, and specific
+    - Identify 1-3 genuine improvements at most — don't overwhelm
+    - Always start by celebrating something done well
+    - If the transcription is very short, encourage more development with example phrases
+    - If the speech is good, say so clearly and suggest enrichment vocabulary
+
+    Respond ONLY with valid JSON in this exact format, no other text:
+    {
+      "corrected_text": "The full corrected version of what they said in Irish (keep their dialect, fix only real errors). If no errors, reproduce their text.",
+      "well_done": "1-2 sentences in English about what they did well",
+      "corrections": [
+        {
+          "original": "exact phrase they used",
+          "corrected": "corrected version",
+          "explanation": "brief explanation in English (max 15 words)"
+        }
+      ],
+      "vocabulary_for_topic": [
+        {
+          "irish": "focal nó frása",
+          "english": "word or phrase",
+          "example": "Úsáidtear é mar seo."
+        }
+      ],
+      "encouragement": "Abairt spreagtha amháin as Gaeilge."
+    }
+
+    Keep corrections to 3 items max. Keep vocabulary_for_topic to 4-5 items.
+  PROMPT
+
+  response = client.chat(parameters: {
+    model: 'gpt-4o',
+    messages: [
+      { role: 'system', content: system_prompt },
+      { role: 'user', content: "Here is what I said about #{topic}: #{transcription}" }
+    ],
+    temperature: 0.4,
+    response_format: { type: 'json_object' }
+  })
+
+  JSON.parse(response.dig('choices', 0, 'message', 'content'))
 end
 
 def generate_vocabulary(island_data)

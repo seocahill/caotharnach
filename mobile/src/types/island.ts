@@ -24,6 +24,20 @@ export interface Island {
   voice: 'ga_UL_anb_piper' | 'ga_MU_nnc_piper'; // Ulster or Munster
 }
 
+export interface SpeechCorrection {
+  original: string;
+  corrected: string;
+  explanation: string;
+}
+
+export interface SpeechFeedback {
+  corrected_text: string;
+  well_done: string;
+  corrections: SpeechCorrection[];
+  vocabulary_for_topic: VocabWord[];
+  encouragement: string;
+}
+
 export interface CreateIslandRequest {
   audioBlob: string; // base64 encoded audio of English description
   voice?: string;
