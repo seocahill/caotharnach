@@ -11,7 +11,27 @@ import {
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { useAudioRecorder, useAudioRecorderState, AudioModule, RecordingPresets } from 'expo-audio';
+import { useAudioRecorder, useAudioRecorderState, AudioModule, AndroidOutputFormat, AndroidAudioEncoder } from 'expo-audio';
+
+// Android supports WebM/Opus natively — matches what the Abair API expects
+const WEBM_OPUS_PRESET = {
+  android: {
+    extension: '.webm',
+    outputFormat: AndroidOutputFormat.WEBM,
+    audioEncoder: AndroidAudioEncoder.OPUS,
+    sampleRate: 16000,
+    numberOfChannels: 1,
+    bitRate: 64000,
+  },
+  ios: {
+    // Fallback for iOS (Abair may not accept m4a, but iOS isn't deployed yet)
+    extension: '.m4a',
+    audioQuality: 127, // IOSAudioQuality.HIGH
+    sampleRate: 16000,
+    numberOfChannels: 1,
+    bitRate: 64000,
+  },
+};
 import * as FileSystem from 'expo-file-system/legacy';
 import { RootStackParamList } from '../../App';
 import { api } from '../services/api';
@@ -45,7 +65,7 @@ export function SpeechImproverScreen({ navigation }: Props) {
   const [topicLocked, setTopicLocked] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const audioRecorder = useAudioRecorder(WEBM_OPUS_PRESET);
   const recorderState = useAudioRecorderState(audioRecorder);
 
   const startRecording = async () => {
