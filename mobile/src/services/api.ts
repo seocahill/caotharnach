@@ -68,13 +68,13 @@ export const api = {
   // Get speech improvement feedback from GPT
   async improveSpeech(
     transcription: string,
-    topic: string,
-    dialect: 'ulster' | 'connacht' | 'munster'
+    context: string,
+    dialect: 'ulster' | 'connacht' | 'mayo' | 'munster'
   ): Promise<SpeechFeedback> {
     const response = await fetch(`${API_BASE}/api/speech/improve`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({ transcription, topic, dialect }),
+      body: JSON.stringify({ transcription, context, dialect }),
     });
 
     if (!response.ok) {

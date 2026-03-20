@@ -322,7 +322,7 @@ post '/api/speech/improve' do
   begin
     request_payload = JSON.parse(request.body.read)
     transcription = request_payload['transcription']
-    topic = request_payload['topic'] || 'general conversation'
+    context = request_payload['context'] || 'general conversation in Irish'
     dialect = request_payload['dialect'] || 'connacht'
 
     if transcription.nil? || transcription.strip.empty?
@@ -330,8 +330,8 @@ post '/api/speech/improve' do
       return { error: 'No transcription provided' }.to_json
     end
 
-    puts "[speech/improve] Generating feedback for dialect=#{dialect}, topic=#{topic}"
-    feedback = generate_speech_feedback(transcription, topic, dialect)
+    puts "[speech/improve] Generating feedback for dialect=#{dialect}"
+    feedback = generate_speech_feedback(transcription, context, dialect)
     feedback.to_json
   rescue => e
     puts "[speech/improve] Error: #{e.message}"
@@ -606,68 +606,94 @@ def transcribe_irish_abair(audio_base64)
   JSON.parse(response.body)
 end
 
-def generate_speech_feedback(transcription, topic, dialect)
+def generate_speech_feedback(transcription, context, dialect)
   client = OpenAI::Client.new(access_token: ENV['OPENAI_KEY'], organization_id: ENV['OPENAI_ORG'])
 
   dialect_description = case dialect
   when 'ulster'
-    'Ulster Irish (Donegal/Tír Chonaill). Common features: "cha" for negation, broad pronunciation, specific vocabulary.'
+    'Ulster Irish (Donegal/Tír Chonaill). Features: "cha/chan" for negation, "ag" before verbal nouns, specific lexis (e.g. "teach mór" not "teach mór").'
   when 'munster'
-    'Munster Irish (Kerry/Cork/Waterford). Common features: synthetic verb forms like "bhíos/bhíomar", specific stress patterns.'
+    'Munster Irish (Kerry/Cork/Waterford). Features: synthetic verb forms (bhíos, bhíomar), stress on final syllables, specific vocabulary.'
+  when 'mayo'
+    'Mayo Irish (Connacht). Features: similar to Galway Irish but with distinctive phonology from Erris, Achill and Partry areas. Treat as valid Connacht Irish.'
   else
-    'Connacht Irish (Galway/Mayo/Aran). Common features: "níl" for negation, specific vocabulary and phonology.'
+    'Connacht Irish (Galway/Aran Islands). Features: "níl" for negation, "ag" before verbal nouns, specific vocabulary and phonology.'
   end
 
   system_prompt = <<~PROMPT
-    You are a warm, encouraging Irish language coach helping someone practice speaking Irish.
-    The learner is practicing speaking about: "#{topic}"
-    Their dialect is: #{dialect_description}
+    You are an experienced Irish language coach. A learner is practicing spoken Irish.
 
-    CRITICAL DIALECT RULES:
-    - Dialectal variation is NOT an error. If someone uses Ulster, Connacht, or Munster forms correctly for their dialect, that is CORRECT Irish.
-    - Do NOT correct valid dialectal forms (e.g., "cha raibh" is correct Ulster Irish, not an error).
-    - Only flag genuine grammatical mistakes, not dialect choices.
-    - If unsure whether something is dialectal or an error, err on the side of accepting it.
-    - Vocabulary suggestions should prefer words natural in the learner's dialect.
+    CONTEXT (what the learner intended to talk about):
+    #{context}
 
-    COACHING APPROACH:
-    - Be warm, encouraging, and specific
-    - Identify 1-3 genuine improvements at most — don't overwhelm
-    - Always start by celebrating something done well
-    - If the transcription is very short, encourage more development with example phrases
-    - If the speech is good, say so clearly and suggest enrichment vocabulary
+    THEIR DIALECT: #{dialect_description}
 
-    Respond ONLY with valid JSON in this exact format, no other text:
+    YOUR TASK: Analyse their Irish speech transcription and give structured feedback across three areas:
+
+    1. BÉARLACHAS — direct translations or calques from English that sound unnatural even if technically correct.
+       Examples of béarlachas:
+       - "rinne mé cinnte" (made sure) → better: "chinnigh mé" or "bhí mé cinnte"
+       - "tá áthas orm a rá" (I am happy to say) → better: "is maith liom a rá"
+       - "ag an am céanna" every sentence as a filler → suggest variation
+       - Overuse of "go leor" where a more precise word fits
+       Only flag clear béarlachas — don't invent problems.
+
+    2. GRAMMAR — genuine errors only. Focus on:
+       - Genitive case (e.g. "teach mo athair" → "teach m'athar")
+       - Incorrect plurals (e.g. "fir mhór" → "fir mhóra")
+       - Verbal noun errors (e.g. wrong form after "ag")
+       - Initial mutations where clearly wrong
+       Do NOT flag dialectal grammar as errors.
+
+    3. MISSING VOCABULARY — words or phrases the learner probably needed but didn't use or had to avoid.
+       Infer these from the context and from what they said. These are words they'd need to speak fluently on this topic.
+
+    DIALECT RULES (critical):
+    - Dialectal forms are CORRECT — do not flag them as errors under any category.
+    - "cha raibh", "cha bhfuil" are correct Ulster Irish.
+    - Synthetic forms (bhíos, fuaireas) are correct Munster Irish.
+    - If unsure whether something is dialectal or an error, leave it out.
+
+    TONE: Warm, specific, never overwhelming. Max 3 items per section.
+
+    Respond ONLY with valid JSON, no other text:
     {
-      "corrected_text": "The full corrected version of what they said in Irish (keep their dialect, fix only real errors). If no errors, reproduce their text.",
-      "well_done": "1-2 sentences in English about what they did well",
-      "corrections": [
+      "well_done": "1-2 sentences in English: what they did well and what came across naturally",
+      "bearlaghas": [
         {
-          "original": "exact phrase they used",
-          "corrected": "corrected version",
-          "explanation": "brief explanation in English (max 15 words)"
+          "said": "the phrase as they used it",
+          "suggestion": "more idiomatic Irish alternative",
+          "explanation": "brief note on why (max 12 words)"
         }
       ],
-      "vocabulary_for_topic": [
+      "grammar_corrections": [
+        {
+          "original": "what they said",
+          "corrected": "corrected form",
+          "explanation": "brief grammatical reason (max 12 words)"
+        }
+      ],
+      "missing_vocabulary": [
         {
           "irish": "focal nó frása",
-          "english": "word or phrase",
-          "example": "Úsáidtear é mar seo."
+          "english": "meaning",
+          "example": "short example sentence"
         }
       ],
-      "encouragement": "Abairt spreagtha amháin as Gaeilge."
+      "encouragement": "Abairt amháin spreagtha as Gaeilge."
     }
 
-    Keep corrections to 3 items max. Keep vocabulary_for_topic to 4-5 items.
+    If bearlaghas or grammar_corrections are empty, return empty arrays — do not invent problems.
+    Keep each array to 3 items max. missing_vocabulary: 4-5 items.
   PROMPT
 
   response = client.chat(parameters: {
     model: 'gpt-4o',
     messages: [
       { role: 'system', content: system_prompt },
-      { role: 'user', content: "Here is what I said about #{topic}: #{transcription}" }
+      { role: 'user', content: transcription }
     ],
-    temperature: 0.4,
+    temperature: 0.3,
     response_format: { type: 'json_object' }
   })
 

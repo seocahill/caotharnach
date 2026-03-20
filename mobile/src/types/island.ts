@@ -24,17 +24,23 @@ export interface Island {
   voice: 'ga_UL_anb_piper' | 'ga_MU_nnc_piper'; // Ulster or Munster
 }
 
-export interface SpeechCorrection {
+export interface BearlaghasItem {
+  said: string;        // the phrase used (direct translation / calque)
+  suggestion: string;  // idiomatic Irish alternative
+  explanation: string; // why it sounds unnatural
+}
+
+export interface GrammarCorrection {
   original: string;
   corrected: string;
-  explanation: string;
+  explanation: string; // e.g. "genitive case required after 'ag'"
 }
 
 export interface SpeechFeedback {
-  corrected_text: string;
   well_done: string;
-  corrections: SpeechCorrection[];
-  vocabulary_for_topic: VocabWord[];
+  bearlaghas: BearlaghasItem[];
+  grammar_corrections: GrammarCorrection[];
+  missing_vocabulary: VocabWord[];
   encouragement: string;
 }
 
