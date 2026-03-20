@@ -581,8 +581,8 @@ def transcribe_irish_abair(audio_base64)
   # Build multipart body as binary-safe string
   body = ''.dup.force_encoding('BINARY')
   body << "--#{boundary}\r\n"
-  body << "Content-Disposition: form-data; name=\"file\"; filename=\"recording.webm\"\r\n"
-  body << "Content-Type: audio/webm;codecs=opus\r\n"
+  body << "Content-Disposition: form-data; name=\"file\"; filename=\"recording.m4a\"\r\n"
+  body << "Content-Type: audio/mp4\r\n"
   body << "\r\n"
   body << audio_data.force_encoding('BINARY')
   body << "\r\n"

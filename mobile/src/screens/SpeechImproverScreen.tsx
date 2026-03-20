@@ -15,8 +15,6 @@ import {
   useAudioRecorderState,
   AudioModule,
   RecordingPresets,
-  AndroidOutputFormat,
-  AndroidAudioEncoder,
 } from 'expo-audio';
 import * as FileSystem from 'expo-file-system/legacy';
 import { RootStackParamList } from '../../App';
@@ -35,25 +33,6 @@ interface Attempt {
   transcription: string;
   feedback: SpeechFeedback;
 }
-
-// WebM/Opus matches what the Abair recognition API expects
-const WEBM_OPUS_PRESET = {
-  android: {
-    extension: '.webm',
-    outputFormat: AndroidOutputFormat.WEBM,
-    audioEncoder: AndroidAudioEncoder.OPUS,
-    sampleRate: 16000,
-    numberOfChannels: 1,
-    bitRate: 64000,
-  },
-  ios: {
-    extension: '.m4a',
-    audioQuality: 127,
-    sampleRate: 16000,
-    numberOfChannels: 1,
-    bitRate: 64000,
-  },
-};
 
 const DIALECT_LABELS: Record<Dialect, string> = {
   ulster: 'Ultach',
@@ -77,10 +56,10 @@ export function SpeechImproverScreen({ navigation }: Props) {
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Two recorders: English context uses HIGH_QUALITY (→ Whisper), Irish uses WebM/Opus (→ Abair)
+  // Both recorders use HIGH_QUALITY (m4a/AAC works fine for both Whisper and Abair)
   const contextRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const contextRecorderState = useAudioRecorderState(contextRecorder);
-  const irishRecorder = useAudioRecorder(WEBM_OPUS_PRESET);
+  const irishRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const irishRecorderState = useAudioRecorderState(irishRecorder);
 
   const fullContext = contextChunks.join('\n\n');
