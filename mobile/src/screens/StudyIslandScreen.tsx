@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -39,6 +39,16 @@ export function StudyIslandScreen({ route, navigation }: Props) {
   const audioPlayer = useAudioPlayer();
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(audioRecorder);
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity onPress={() => navigation.navigate('SpeechImprover', { island })}>
+          <Ionicons name="mic-outline" size={26} color="#fff" />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, island]);
 
   const toggleTranslation = (sentenceId: string) => {
     setExpandedSentences(prev => {
@@ -304,6 +314,16 @@ export function StudyIslandScreen({ route, navigation }: Props) {
           <Text style={styles.descriptionLabel}>Cur síos:</Text>
           <Text style={styles.descriptionText}>{island.description}</Text>
         </View>
+
+        {/* Practice speech button */}
+        <TouchableOpacity
+          style={styles.practiceButton}
+          onPress={() => navigation.navigate('SpeechImprover', { island })}
+        >
+          <Ionicons name="mic-outline" size={20} color="#fff" />
+          <Text style={styles.practiceButtonText}>Cleachtadh Cainte</Text>
+          <Ionicons name="chevron-forward" size={18} color="#fff" style={{ marginLeft: 'auto' }} />
+        </TouchableOpacity>
 
         {/* View mode tabs */}
         <View style={styles.tabContainer}>
@@ -679,6 +699,22 @@ const styles = StyleSheet.create({
   flashcardHintText: {
     fontSize: 12,
     color: '#999',
+  },
+  practiceButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2e7d32',
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 10,
+  },
+  practiceButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    flex: 1,
   },
   playAllButton: {
     flexDirection: 'row',

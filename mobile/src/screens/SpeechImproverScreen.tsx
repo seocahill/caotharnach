@@ -8,11 +8,12 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import {
   useAudioRecorder,
   useAudioRecorderState,
+  useAudioPlayer,
   AudioModule,
   RecordingPresets,
 } from 'expo-audio';
@@ -22,9 +23,7 @@ import { api } from '../services/api';
 import { SpeechFeedback } from '../types/island';
 import { CONFIG } from '../config';
 
-type Props = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'SpeechImprover'>;
-};
+type Props = NativeStackScreenProps<RootStackParamList, 'SpeechImprover'>;
 
 type Dialect = 'ulster' | 'connacht' | 'mayo' | 'munster';
 
@@ -32,6 +31,7 @@ interface Attempt {
   id: number;
   transcription: string;
   feedback: SpeechFeedback;
+  audioUri?: string;
 }
 
 const DIALECT_LABELS: Record<Dialect, string> = {
@@ -41,9 +41,13 @@ const DIALECT_LABELS: Record<Dialect, string> = {
   munster: 'Muimhneach',
 };
 
-export function SpeechImproverScreen({ navigation }: Props) {
+export function SpeechImproverScreen({ navigation, route }: Props) {
+  const sourceIsland = route.params?.island;
+
   // Context (English description of what to practise)
-  const [contextChunks, setContextChunks] = useState<string[]>([]);
+  const [contextChunks, setContextChunks] = useState<string[]>(
+    () => sourceIsland ? [sourceIsland.description] : []
+  );
   const [isRecordingContext, setIsRecordingContext] = useState(false);
   const [isProcessingContext, setIsProcessingContext] = useState(false);
 
@@ -157,6 +161,11 @@ export function SpeechImproverScreen({ navigation }: Props) {
       const uri = irishRecorder.uri;
       if (!uri) throw new Error('No recording URI');
 
+      // Save a copy for playback before reading as base64
+      const attemptId = Date.now();
+      const savedUri = `${FileSystem.cacheDirectory}speech_attempt_${attemptId}.m4a`;
+      await FileSystem.copyAsync({ from: uri, to: savedUri });
+
       const audioBase64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
@@ -167,6 +176,7 @@ export function SpeechImproverScreen({ navigation }: Props) {
       const transcription = asrResult.transcription;
 
       if (!transcription?.trim()) {
+        await FileSystem.deleteAsync(savedUri, { idempotent: true });
         Alert.alert(
           'Gan aithint',
           'Níorbh fhéidir do chuid cainte a aithint. Labhair go soiléir, ní róthapa.'
@@ -178,7 +188,7 @@ export function SpeechImproverScreen({ navigation }: Props) {
       setProcessingStage('Ag ullmhú aiseolais...');
       const feedback = await api.improveSpeech(transcription, fullContext, dialect);
 
-      setAttempts(prev => [...prev, { id: Date.now(), transcription, feedback }]);
+      setAttempts(prev => [...prev, { id: attemptId, transcription, feedback, audioUri: savedUri }]);
       setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (error) {
       console.error('[SpeechImprover] Irish practice failed:', error);
@@ -201,11 +211,27 @@ export function SpeechImproverScreen({ navigation }: Props) {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
+        {/* ── Island source banner ── */}
+        {sourceIsland && (
+          <View style={styles.islandSourceCard}>
+            <View style={styles.islandSourceHeader}>
+              <Ionicons name="leaf-outline" size={16} color="#1a5f2a" />
+              <Text style={styles.islandSourceLabel}>Oileán</Text>
+            </View>
+            <Text style={styles.islandSourceTitle}>{sourceIsland.title}</Text>
+            {sourceIsland.titleIrish && (
+              <Text style={styles.islandSourceTitleIrish}>{sourceIsland.titleIrish}</Text>
+            )}
+          </View>
+        )}
+
         {/* ── Context section ── */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Cur síos ar an ábhar</Text>
+          <Text style={styles.cardTitle}>Comhthéacs</Text>
           <Text style={styles.cardSubtitle}>
-            Inis i mBéarla cad é an ábhar, an téama nó an fócas atá agat — chomh mionsonraithe agus is féidir.
+            {sourceIsland
+              ? 'Cur síos an oileáin atá in úsáid mar chomhthéacs. Is féidir leat tuilleadh a chur leis.'
+              : 'Inis i mBéarla cad é an ábhar, an téama nó an fócas atá agat — chomh mionsonraithe agus is féidir.'}
           </Text>
 
           {contextChunks.map((chunk, i) => (
@@ -324,13 +350,45 @@ function AttemptCard({ attempt, index }: { attempt: Attempt; index: number }) {
   const hasGrammar = feedback.grammar_corrections?.length > 0;
   const hasMissingVocab = feedback.missing_vocabulary?.length > 0;
 
+  const audioPlayer = useAudioPlayer();
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  React.useEffect(() => {
+    if (isPlaying && !audioPlayer.playing) {
+      setIsPlaying(false);
+    }
+  }, [audioPlayer.playing, isPlaying]);
+
+  const togglePlayback = () => {
+    if (!attempt.audioUri) return;
+    if (isPlaying) {
+      audioPlayer.pause();
+      setIsPlaying(false);
+    } else {
+      audioPlayer.replace({ uri: attempt.audioUri });
+      audioPlayer.play();
+      setIsPlaying(true);
+    }
+  };
+
   return (
     <View style={styles.card}>
       <Text style={styles.attemptHeader}>Iarracht {index + 1}</Text>
 
       {/* Transcription */}
       <View style={styles.section}>
-        <SectionHeading icon="mic-outline" label="A dúirt tú" />
+        <View style={styles.transcriptionRow}>
+          <SectionHeading icon="mic-outline" label="A dúirt tú" />
+          {attempt.audioUri && (
+            <TouchableOpacity style={styles.playbackButton} onPress={togglePlayback}>
+              <Ionicons
+                name={isPlaying ? 'stop-circle-outline' : 'play-circle-outline'}
+                size={24}
+                color={isPlaying ? '#c62828' : '#1a5f2a'}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
         <Text style={styles.transcriptionText}>{attempt.transcription}</Text>
       </View>
 
@@ -438,6 +496,51 @@ const styles = StyleSheet.create({
     color: '#777',
     lineHeight: 18,
     marginBottom: 12,
+  },
+
+  // Island source banner
+  islandSourceCard: {
+    backgroundColor: '#e8f5e9',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#a5d6a7',
+  },
+  islandSourceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 4,
+  },
+  islandSourceLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1a5f2a',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  islandSourceTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1a5f2a',
+  },
+  islandSourceTitleIrish: {
+    fontSize: 14,
+    color: '#2e7d32',
+    fontStyle: 'italic',
+    marginTop: 2,
+  },
+
+  // Transcription row (with playback button)
+  transcriptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  playbackButton: {
+    padding: 4,
   },
 
   // Context chunks
