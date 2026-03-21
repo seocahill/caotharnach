@@ -19,5 +19,9 @@ export const CONFIG = {
   // Get the appropriate URL based on environment
   get API_BASE() {
     return __DEV__ ? this.API_BASE_DEV : this.API_BASE_PROD;
-  }
+  },
+
+  // Abairt API (native dialect audio)
+  ABAIRT_API_BASE: 'https://abairt.com',
+  ABAIRT_API_KEY: '', // Set your Abairt bearer token here
 };
