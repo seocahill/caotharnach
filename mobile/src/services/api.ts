@@ -1,4 +1,4 @@
-import { Island, Sentence, VocabWord, SpeechFeedback } from '../types/island';
+import { Island, Sentence, VocabWord, SpeechFeedback, AbairtEntry } from '../types/island';
 import { CONFIG } from '../config';
 
 // Use CONFIG.API_BASE - edit src/config.ts to change URLs
@@ -139,6 +139,26 @@ export const api = {
 
     const data = await response.json();
     return data.sentences;
+  },
+
+  // Fetch native dialect audio entries matching an island description from Abairt
+  async fetchIslandContext(description: string, limit: number = 20): Promise<AbairtEntry[]> {
+    const response = await fetch(`${CONFIG.ABAIRT_API_BASE}/api/island_context`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${CONFIG.ABAIRT_API_KEY}`,
+      },
+      body: JSON.stringify({ description, limit }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Abairt API failed: ${error}`);
+    }
+
+    const data = await response.json();
+    return data.entries;
   },
 
   // Generate vocabulary for an island

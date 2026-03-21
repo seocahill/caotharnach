@@ -14,7 +14,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
 import { RootStackParamList } from '../../App';
-import { Sentence, Island, VocabWord } from '../types/island';
+import { Sentence, Island, VocabWord, AbairtEntry } from '../types/island';
 import { api } from '../services/api';
 import { storage } from '../services/storage';
 
@@ -31,11 +31,16 @@ export function StudyIslandScreen({ route, navigation }: Props) {
   const [isExpanding, setIsExpanding] = useState(false);
   const [useVoiceInput, setUseVoiceInput] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
-  const [viewMode, setViewMode] = useState<'sentences' | 'vocabulary'>('sentences');
+  const [viewMode, setViewMode] = useState<'sentences' | 'vocabulary' | 'canuit'>('sentences');
   const [vocabulary, setVocabulary] = useState<VocabWord[]>(island.vocabulary || []);
   const [loadingVocabulary, setLoadingVocabulary] = useState(false);
   const [flippedCards, setFlippedCards] = useState<Set<number>>(new Set());
   const [showIrishFirst, setShowIrishFirst] = useState(true); // Direction toggle for flashcards
+  const [abairtEntries, setAbairtEntries] = useState<AbairtEntry[]>([]);
+  const [dismissedAbairtIds, setDismissedAbairtIds] = useState<Set<number>>(new Set());
+  const [loadingAbairt, setLoadingAbairt] = useState(false);
+  const [abairtFetched, setAbairtFetched] = useState(false);
+  const [playingAbairtId, setPlayingAbairtId] = useState<number | null>(null);
   const audioPlayer = useAudioPlayer();
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(audioRecorder);
@@ -118,6 +123,48 @@ export function StudyIslandScreen({ route, navigation }: Props) {
   const stopPlayback = () => {
     audioPlayer.pause();
     setPlayingSentence(null);
+    setPlayingAbairtId(null);
+  };
+
+  const fetchAbairtContext = async () => {
+    if (abairtFetched) return;
+    setLoadingAbairt(true);
+    try {
+      const entries = await api.fetchIslandContext(island.description);
+      setAbairtEntries(entries);
+      setAbairtFetched(true);
+    } catch (error) {
+      console.error('[StudyIsland] Abairt fetch failed:', error);
+      Alert.alert('Earráid', 'Níorbh fhéidir torthaí a fháil ó Abairt');
+    } finally {
+      setLoadingAbairt(false);
+    }
+  };
+
+  const playAbairtEntry = async (entry: AbairtEntry) => {
+    try {
+      setPlayingSentence(null);
+      setPlayingAbairtId(entry.id);
+      audioPlayer.replace({ uri: entry.audio_url });
+      audioPlayer.play();
+
+      await new Promise<void>((resolve) => {
+        const check = setInterval(() => {
+          if (!audioPlayer.playing) {
+            setPlayingAbairtId(null);
+            clearInterval(check);
+            resolve();
+          }
+        }, 100);
+      });
+    } catch (error) {
+      console.error('[StudyIsland] Abairt playback failed:', error);
+      setPlayingAbairtId(null);
+    }
+  };
+
+  const dismissAbairtEntry = (id: number) => {
+    setDismissedAbairtIds(prev => new Set([...prev, id]));
   };
 
   const playAll = async () => {
@@ -350,9 +397,79 @@ export function StudyIslandScreen({ route, navigation }: Props) {
               Stór Focal
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, viewMode === 'canuit' && styles.tabActive]}
+            onPress={() => {
+              setViewMode('canuit');
+              fetchAbairtContext();
+            }}
+          >
+            <Ionicons name="person" size={20} color={viewMode === 'canuit' ? '#fff' : '#1a5f2a'} />
+            <Text style={[styles.tabText, viewMode === 'canuit' && styles.tabTextActive]}>
+              Canúint
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {viewMode === 'sentences' ? (
+        {viewMode === 'canuit' ? (
+          /* Native dialect audio from Abairt */
+          <View style={styles.canuitContainer}>
+            <View style={styles.canuitHeader}>
+              <Ionicons name="information-circle-outline" size={16} color="#666" />
+              <Text style={styles.canuitHeaderText}>
+                Nathanna ó chainteoirí dúchais ó Abairt — b'fhéidir go mbeidh cuid acu oiriúnach, cuid eile nach mbeidh.
+              </Text>
+            </View>
+
+            {loadingAbairt ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#1a5f2a" />
+                <Text style={styles.loadingText}>Ag lorg canúna dúchais...</Text>
+              </View>
+            ) : abairtFetched && abairtEntries.filter(e => !dismissedAbairtIds.has(e.id)).length === 0 ? (
+              <Text style={styles.emptyText}>
+                {abairtEntries.length === 0
+                  ? 'Níor aimsíodh aon toradh don oileán seo'
+                  : 'Gach toradh díbeartha agat'}
+              </Text>
+            ) : (
+              abairtEntries
+                .filter(e => !dismissedAbairtIds.has(e.id))
+                .map(entry => {
+                  const isPlaying = playingAbairtId === entry.id;
+                  return (
+                    <View key={entry.id} style={styles.abairtCard}>
+                      <View style={styles.abairtCardMain}>
+                        <TouchableOpacity
+                          style={[styles.abairtPlayButton, isPlaying && styles.abairtPlayButtonActive]}
+                          onPress={() => isPlaying ? stopPlayback() : playAbairtEntry(entry)}
+                        >
+                          <Ionicons
+                            name={isPlaying ? 'stop' : 'play'}
+                            size={20}
+                            color={isPlaying ? '#fff' : '#1a5f2a'}
+                          />
+                        </TouchableOpacity>
+                        <View style={styles.abairtCardText}>
+                          <Text style={styles.abairtIrish}>{entry.word_or_phrase}</Text>
+                          <Text style={styles.abairtEnglish}>{entry.translation}</Text>
+                          <Text style={styles.abairtMeta}>
+                            {entry.speaker.name} · {entry.speaker.dialect}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.abairtDismissButton}
+                          onPress={() => dismissAbairtEntry(entry.id)}
+                        >
+                          <Ionicons name="close" size={18} color="#bbb" />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })
+            )}
+          </View>
+        ) : viewMode === 'sentences' ? (
           <>
             {/* Play all button */}
         <TouchableOpacity style={styles.playAllButton} onPress={playAll}>
@@ -843,6 +960,78 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginLeft: 6,
+  },
+  canuitContainer: {
+    gap: 12,
+  },
+  canuitHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 4,
+  },
+  canuitHeaderText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#777',
+    lineHeight: 17,
+    fontStyle: 'italic',
+  },
+  abairtCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+    borderLeftWidth: 3,
+    borderLeftColor: '#a5d6a7',
+  },
+  abairtCardMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  abairtPlayButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e8f5e9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  abairtPlayButtonActive: {
+    backgroundColor: '#1a5f2a',
+  },
+  abairtCardText: {
+    flex: 1,
+  },
+  abairtIrish: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#1a5f2a',
+    lineHeight: 22,
+  },
+  abairtEnglish: {
+    fontSize: 13,
+    color: '#555',
+    marginTop: 2,
+  },
+  abairtMeta: {
+    fontSize: 11,
+    color: '#aaa',
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  abairtDismissButton: {
+    padding: 6,
+    flexShrink: 0,
   },
   sentencesContainer: {
     gap: 12,
