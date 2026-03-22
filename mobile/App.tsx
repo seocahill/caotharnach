@@ -20,7 +20,7 @@ export type RootStackParamList = {
   StudyIsland: { island: Island };
   About: undefined;
   Conversation: undefined;
-  SpeechImprover: undefined;
+  SpeechImprover: { island?: Island } | undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();

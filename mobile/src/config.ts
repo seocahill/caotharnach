@@ -1,23 +1,25 @@
 // API Configuration
-// Change this to your local IP when developing locally
-// Or use the fly.io URL for production
+// Environment variables are loaded from:
+// - Local dev: mobile/.env (gitignored)
+// - Builds: eas.json env vars
+// - Accessed via expo-constants
 
-// To find your local IP on Mac: ifconfig | grep "inet " | grep -v 127.0.0.1
-// To find your local IP on Linux: hostname -I
+import Constants from 'expo-constants';
+
+const extra = Constants.expoConfig?.extra;
 
 export const CONFIG = {
-  // For local development, use your machine's IP (not localhost!)
-  // Example: 'http://192.168.1.3:3000'
-  API_BASE_DEV: 'http://192.168.1.5:8080',
-
-  // Production URL
-  API_BASE_PROD: 'https://an-caotharnach.fly.dev',
-
-  // API Key for authentication
-  API_KEY: '84ebf2563720f33ffd35701c3c54b8557429e0f54dda86320e763b29b61e05c7',
+  // API URLs
+  API_BASE_DEV: extra?.apiBaseDev || 'http://localhost:8080',
+  API_BASE_PROD: extra?.apiBaseProd || 'https://an-caotharnach.fly.dev',
 
   // Get the appropriate URL based on environment
   get API_BASE() {
     return __DEV__ ? this.API_BASE_DEV : this.API_BASE_PROD;
-  }
+  },
+
+  // API Keys (loaded from environment)
+  API_KEY: extra?.appApiKey || '',
+  ABAIRT_API_BASE: extra?.abairtApiBase || 'https://abairt.com',
+  ABAIRT_API_KEY: extra?.abairtApiKey || '',
 };

@@ -44,6 +44,31 @@ export interface SpeechFeedback {
   encouragement: string;
 }
 
+export interface AbairtSpeaker {
+  id: number;
+  name: string;
+  dialect: string;
+}
+
+export interface AbairtVoiceRecording {
+  id: number;
+  title: string;
+  external_id: string;
+}
+
+export interface AbairtEntry {
+  id: number;
+  word_or_phrase: string;
+  translation: string;
+  region_id: number;
+  region_start: number;
+  region_end: number;
+  updated_at: string;
+  audio_url: string;
+  speaker: AbairtSpeaker;
+  voice_recording: AbairtVoiceRecording;
+}
+
 export interface CreateIslandRequest {
   audioBlob: string; // base64 encoded audio of English description
   voice?: string;
