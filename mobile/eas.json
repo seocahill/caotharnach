@@ -6,13 +6,28 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "API_BASE_DEV": "http://192.168.1.5:8080",
+        "API_BASE_PROD": "https://an-caotharnach.fly.dev",
+        "ABAIRT_API_BASE": "https://abairt.com"
+      }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "API_BASE_DEV": "http://localhost:8080",
+        "API_BASE_PROD": "https://an-caotharnach.fly.dev",
+        "ABAIRT_API_BASE": "https://abairt.com"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "API_BASE_DEV": "http://localhost:8080",
+        "API_BASE_PROD": "https://an-caotharnach.fly.dev",
+        "ABAIRT_API_BASE": "https://abairt.com"
+      }
     }
   },
   "submit": {
