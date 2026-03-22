@@ -140,8 +140,8 @@ npm install -g eas-cli
 eas login
 
 # Set up EAS secrets (REQUIRED - these aren't in the repo)
-eas secret:create --scope project --name APP_API_KEY --value "<backend-api-key>" --type string
-eas secret:create --scope project --name ABAIRT_API_KEY --value "your-abairt-key" --type string
+eas secret:create --scope project --name APP_API_KEY --value $APP_API_KEY --type string
+eas secret:create --scope project --name ABAIRT_API_KEY --value $ABAIRT_API_KEY --type string
 
 # Verify secrets are set
 eas secret:list
