@@ -23,5 +23,5 @@ export const CONFIG = {
 
   // Abairt API (native dialect audio)
   ABAIRT_API_BASE: 'https://abairt.com',
-  ABAIRT_API_KEY: '', // Set your Abairt bearer token here
+  ABAIRT_API_KEY: 't6CDSiWvYLSQL22g5ZkxFefu', // Set your Abairt bearer token here
 };
