@@ -8,6 +8,98 @@ require 'securerandom'
 require 'openai'
 require 'dotenv/load'
 
+# Thin client for the ABAIR v4 API (https://api.abair.ie/v4/docs).
+# The API key stays on the server; the mobile app only talks to this backend.
+class AbairClient
+  class Error < StandardError
+    attr_reader :status
+
+    def initialize(message, status = nil)
+      super(message)
+      @status = status
+    end
+  end
+
+  class Unauthorized < Error; end
+  class QuotaExceeded < Error; end
+
+  DEFAULT_URL = 'https://api.abair.ie/v4'.freeze
+
+  # The old v3 voice names look like "ga_UL_anb_piper"; v4 ids look like "anb.piper".
+  # This mapping is inferred from the naming pattern, so check it against #voices.
+  LEGACY_VOICE = /\Aga_[A-Z]{2}_(?<name>[a-z0-9]+)_(?<engine>[a-z0-9]+)\z/
+
+  def self.voice_id(voice)
+    match = LEGACY_VOICE.match(voice.to_s)
+    match ? "#{match[:name]}.#{match[:engine]}" : voice.to_s
+  end
+
+  def initialize(api_key: ENV['ABAIR_API_KEY'], base_url: ENV.fetch('ABAIR_API_URL', DEFAULT_URL))
+    raise Error, 'ABAIR_API_KEY is not set' if api_key.nil? || api_key.empty?
+
+    @api_key = api_key
+    @base_url = base_url.chomp('/')
+  end
+
+  # Batch speech recognition. Accepts any audio format ffmpeg can decode,
+  # up to 30 seconds and 5 MB. Returns the transcript text.
+  def recognise(audio_bytes, filename: 'audio.m4a', punctuate: false)
+    request = Net::HTTP::Post.new(uri('/recognition/batch', captpunct: punctuate))
+    request.set_form(
+      [['file', audio_bytes, { filename: filename, content_type: 'application/octet-stream' }]],
+      'multipart/form-data'
+    )
+    perform(request).fetch('text', '')
+  end
+
+  # Text to speech. Returns the parsed response, which includes a base64 WAV in "audioContent".
+  def synthesise(text, voice:, speed: 1.0)
+    request = Net::HTTP::Post.new(uri('/synthesis', outputType: 'JSON', audioEncoding: 'WAV'))
+    request['Content-Type'] = 'application/json'
+    request.body = { input: text, voice: self.class.voice_id(voice), speed: speed }.to_json
+    perform(request)
+  end
+
+  def voices
+    perform(Net::HTTP::Get.new(uri('/synthesis/voices')))
+  end
+
+  private
+
+  def uri(path, params = {})
+    URI("#{@base_url}#{path}").tap { |u| u.query = URI.encode_www_form(params) unless params.empty? }
+  end
+
+  def perform(request)
+    request['abair-api-key'] = @api_key
+    response = Net::HTTP.start(request.uri.host, request.uri.port, use_ssl: request.uri.scheme == 'https') do |http|
+      http.request(request)
+    end
+    parse(response)
+  end
+
+  def parse(response)
+    status = response.code.to_i
+    return JSON.parse(response.body) if status.between?(200, 299)
+
+    message = error_message(response)
+    case status
+    when 401, 403 then raise Unauthorized.new(message, status)
+    when 429 then raise QuotaExceeded.new(message, status)
+    else raise Error.new(message, status)
+    end
+  end
+
+  def error_message(response)
+    body = JSON.parse(response.body)
+    body['message'] || body['error'] || response.body
+  rescue JSON::ParserError
+    "ABAIR API returned #{response.code}"
+  end
+end
+
+DEFAULT_VOICE = ENV.fetch('ABAIR_DEFAULT_VOICE', 'ga_UL_anb_piper')
+
 # Session configuration
 enable :sessions
 set :session_secret, ENV['SESSION_SECRET'] || SecureRandom.hex(64)
@@ -96,15 +188,13 @@ post '/forward_audio' do
     session[:context] ||= [
       { role: 'system', content: "You are an Irish speaker called 'An Chaothernach'. You are chatting with another Irish speaker about everyday things, e.g. your job, your family, holidays, the news, the weather, hobbies, etc. Try not to give long answers. If you don't understand, say it." }
     ]
-    session[:guth] ||= 'ga_UL_anb_piper'
+    session[:guth] ||= DEFAULT_VOICE
 
     # Transcribe Irish audio
     puts "[forward_audio] Transcribing Irish audio..."
-    response = forward_audio(audio_blob)
-    puts "[forward_audio] ASR response: #{response.inspect}"
-    prompt = JSON.parse(response.to_json).dig("transcriptions", 0, "utterance")
+    prompt = transcribe_irish(audio_blob)
 
-    if prompt.nil? || prompt.empty?
+    if prompt.empty?
       puts "[forward_audio] ERROR: No transcription received"
       status 500
       return { error: 'Failed to transcribe audio' }.to_json
@@ -121,7 +211,7 @@ post '/forward_audio' do
 
     # Synthesize speech and return
     puts "[forward_audio] Synthesizing speech..."
-    payload = JSON.parse(synthesize_speech(reply))
+    payload = synthesize_speech(reply, session[:guth])
     payload["tusa"] = prompt
     payload["sise"] = reply
     puts "[forward_audio] Success! Returning response"
@@ -131,6 +221,8 @@ post '/forward_audio' do
     puts e.backtrace.first(5)
     status 400
     { error: "Invalid JSON: #{e.message}" }.to_json
+  rescue AbairClient::Error => e
+    abair_error_response(e)
   rescue => e
     puts "[forward_audio] Error in conversation: #{e.message}"
     puts e.backtrace.first(5)
@@ -139,25 +231,20 @@ post '/forward_audio' do
   end
 end
 
-def forward_audio(audio_blob)
-  uri = URI.parse('https://phoneticsrv3.lcs.tcd.ie/asr_api/recognise')
-  http = Net::HTTP.new(uri.host, uri.port)
-  http.use_ssl = true
-  # Disable SSL verification for this specific request
-  http.verify_mode = OpenSSL::SSL::VERIFY_NONE
-  request = Net::HTTP::Post.new(uri.path)
+def abair
+  @abair ||= AbairClient.new
+end
 
-  payload = {
-    recogniseBlob: audio_blob,
-    developer: true,
-    method: 'online2bin'
-  }
+# Irish speech to text via the ABAIR API. Takes the base64 audio the mobile app sends.
+def transcribe_irish(audio_base64)
+  abair.recognise(Base64.decode64(audio_base64)).strip
+end
 
-  request.body = payload.to_json
-  request['Content-Type'] = 'application/json'
-
-  response = http.request(request)
-  JSON.parse(response.body)
+# Status codes for ABAIR failures: 429 when the daily quota is spent, 502 for anything else upstream.
+def abair_error_response(error)
+  puts "[abair] #{error.class}: #{error.message}"
+  status(error.is_a?(AbairClient::QuotaExceeded) ? 429 : 502)
+  { error: error.message, error_class: error.class.to_s }.to_json
 end
 
 def chat_with_gpt
@@ -173,30 +260,9 @@ rescue => e
   "Tá aiféala orm ach tá ganntanas airgid ag cur isteach orm. Tá mo OpenAI cúntas folamh, is dóigh liom."
 end
 
-def synthesize_speech(text)
-  uri = URI.parse('https://api.abair.ie/v3/synthesis')
-  http = Net::HTTP.new(uri.host, uri.port)
-  http.use_ssl = true
-  # Disable SSL verification for this specific request
-  http.verify_mode = OpenSSL::SSL::VERIFY_NONE
-  request = Net::HTTP::Post.new(uri.path)
-  request.body = {
-    synthinput: { text: text, ssml: 'string' },
-    voiceparams: { languageCode: 'ga-IE', name: session[:guth], ssmlGender: 'UNSPECIFIED' },
-    audioconfig: {
-      audioEncoding: 'LINEAR16',
-      speakingRate: 1,
-      pitch: 1,
-      volumeGainDb: 1,
-      htsParams: 'string',
-      sampleRateHertz: 0,
-      effectsProfileId: []
-    },
-    outputType: 'JSON'
-  }.to_json
-  request['Content-Type'] = 'application/json'
-  response = http.request(request)
-  response.body
+# Irish text to speech via the ABAIR API. The response includes base64 WAV in "audioContent".
+def synthesize_speech(text, voice)
+  abair.synthesise(text, voice: voice)
 end
 
 # ============================================
@@ -244,10 +310,11 @@ post '/api/tts' do
   content_type :json
   request_payload = JSON.parse(request.body.read)
   text = request_payload['text']
-  voice = request_payload['voice'] || session[:guth] || 'ga_UL_anb_piper'
+  voice = request_payload['voice'] || session[:guth] || DEFAULT_VOICE
 
-  result = synthesize_speech_for_api(text, voice)
-  result.to_json
+  synthesize_speech(text, voice).to_json
+rescue AbairClient::Error => e
+  abair_error_response(e)
 rescue => e
   puts "Error in TTS: #{e.message}"
   status 500
@@ -274,14 +341,21 @@ post '/api/asr/irish' do
   request_payload = JSON.parse(request.body.read)
   audio_blob = request_payload['audio_blob']
 
-  response = forward_audio(audio_blob)
-  transcription = response.dig("transcriptions", 0, "utterance")
-
-  { transcription: transcription }.to_json
+  { transcription: transcribe_irish(audio_blob) }.to_json
+rescue AbairClient::Error => e
+  abair_error_response(e)
 rescue => e
   puts "Error in Irish ASR: #{e.message}"
   status 500
   { error: e.message }.to_json
+end
+
+# Voices available to this ABAIR API key (ids to use as "voice" or ABAIR_DEFAULT_VOICE)
+get '/api/voices' do
+  content_type :json
+  abair.voices.to_json
+rescue AbairClient::Error => e
+  abair_error_response(e)
 end
 
 # Expand an existing island with more sentences
@@ -418,31 +492,6 @@ def generate_island(description, voice)
     updatedAt: now,
     voice: voice
   }
-end
-
-def synthesize_speech_for_api(text, voice)
-  uri = URI.parse('https://api.abair.ie/v3/synthesis')
-  http = Net::HTTP.new(uri.host, uri.port)
-  http.use_ssl = true
-  http.verify_mode = OpenSSL::SSL::VERIFY_NONE
-  request = Net::HTTP::Post.new(uri.path)
-  request.body = {
-    synthinput: { text: text, ssml: 'string' },
-    voiceparams: { languageCode: 'ga-IE', name: voice, ssmlGender: 'UNSPECIFIED' },
-    audioconfig: {
-      audioEncoding: 'LINEAR16',
-      speakingRate: 1,
-      pitch: 1,
-      volumeGainDb: 1,
-      htsParams: 'string',
-      sampleRateHertz: 0,
-      effectsProfileId: []
-    },
-    outputType: 'JSON'
-  }.to_json
-  request['Content-Type'] = 'application/json'
-  response = http.request(request)
-  JSON.parse(response.body)
 end
 
 def expand_island(island_data, refinement)
