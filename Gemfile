@@ -12,3 +12,9 @@ gem "thin", "~> 1.8"
 
 # Ruby 3.4+ compatibility
 gem 'base64'
+
+group :test do
+  gem 'minitest'
+  gem 'rack-test'
+  gem 'webmock'
+end
